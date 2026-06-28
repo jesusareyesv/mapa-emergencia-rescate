@@ -20,7 +20,8 @@
 
 import js from "@eslint/js";
 // eslint-config-next exports a flat config array when next@16 is present.
-// It is resolved at consumer app level (next must be installed alongside).
+// Resolution happens at the consumer app level (an app that has `next` installed);
+// this package cannot be linted in isolation without `next` present as a peer.
 import nextConfig from "eslint-config-next";
 
 /** @type {import("eslint").Linter.Config[]} */
@@ -33,36 +34,42 @@ const config = [
   ...nextConfig,
 
   // 3. Import-boundary rules (GC5 / GC10 — DDD layer enforcement).
-  //    These use no-restricted-imports to prevent layer inversion.
+  //    Split into separate flat-config objects scoped by `files` glob so that
+  //    restrictions apply only to the relevant layer and non-layer files are unaffected.
+
+  // 3a. domain + application layers: must not import from infrastructure or ui.
   {
-    name: "repo/boundaries",
+    name: "repo/boundaries/domain-application",
+    files: ["**/domain/**", "**/application/**"],
     rules: {
-      // domain layer: must not depend on infrastructure or ui
       "no-restricted-imports": [
         "error",
         {
           patterns: [
             {
-              // Prevent domain code from importing infrastructure concerns
-              group: [
-                "*/infrastructure/*",
-                "../infrastructure/*",
-                "../../infrastructure/*",
-              ],
+              group: ["**/infrastructure/**", "**/ui/**"],
               message:
-                "Domain/Application layer must not import from infrastructure. Use dependency inversion (ports/interfaces).",
+                "domain/application must not depend on infrastructure or ui (DDD layering)",
             },
+          ],
+        },
+      ],
+    },
+  },
+
+  // 3b. ui layer: must not import from contexts (keep components domain-agnostic).
+  {
+    name: "repo/boundaries/ui",
+    files: ["**/ui/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
             {
-              // Prevent domain code from importing UI concerns
-              group: ["*/ui/*", "../ui/*", "../../ui/*", "*/components/*"],
+              group: ["**/contexts/**"],
               message:
-                "Domain/Application layer must not import from ui. Keep business logic UI-agnostic.",
-            },
-            {
-              // Prevent ui components from importing React context providers directly
-              group: ["*/contexts/*", "../contexts/*", "../../contexts/*"],
-              message:
-                "UI components must not import from contexts directly. Receive context values via props or hooks.",
+                "ui must stay domain-agnostic (no imports from contexts)",
             },
           ],
         },

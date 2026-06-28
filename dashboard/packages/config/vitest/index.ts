@@ -9,15 +9,12 @@
 
 import { defineConfig } from "vitest/config";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: [path.resolve(__dirname, "./setup.ts")],
+    // Node >=24 exposes import.meta.dirname natively; no __dirname shim needed.
+    setupFiles: [path.resolve(import.meta.dirname, "./setup.ts")],
   },
 });
