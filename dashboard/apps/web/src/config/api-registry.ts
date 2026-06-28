@@ -1,9 +1,9 @@
 /**
  * API registry — maps logical API identifiers to base URLs read from env.
  *
- * Throws a clear configuration error at startup if a required env var is missing.
- * This throw is intentional: a missing base URL is a deployment misconfiguration,
- * not a runtime error that should be silently swallowed.
+ * Throws a clear configuration error at startup if a required env var is missing
+ * or if the value is not a valid absolute URL.
+ * Trailing slashes are stripped to avoid double-slash paths (e.g. https://x//api/…).
  */
 
 export type ApiId = "emergency" | "supplies";
@@ -19,5 +19,10 @@ export function getApiBaseUrl(id: ApiId): string {
   if (!value) {
     throw new Error(`${envKey} is not set`);
   }
-  return value;
+  try {
+    new URL(value);
+  } catch {
+    throw new Error(`${envKey} is not a valid URL: ${value}`);
+  }
+  return value.replace(/\/+$/, "");
 }

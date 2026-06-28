@@ -20,5 +20,5 @@ export function getAdminToken(request: Request): string | null {
   if (!value || value.trim() === "") {
     return null;
   }
-  return value;
+  return value.trim();
 }

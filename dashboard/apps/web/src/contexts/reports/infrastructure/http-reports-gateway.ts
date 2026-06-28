@@ -12,6 +12,7 @@
 import { createHttpClient } from "../../../shared/http/http-client";
 import { err } from "../../../shared/result";
 import { getApiBaseUrl } from "../../../config/api-registry";
+import { ADMIN_TOKEN_HEADER } from "../../../shared/auth/admin-token";
 import type { ReportsGateway } from "../application/reports-gateway";
 import type { Result } from "../../../shared/result";
 import type { Report } from "../domain/report";
@@ -28,7 +29,7 @@ export function createHttpReportsGateway(): ReportsGateway {
   return {
     async list(token: string): Promise<Result<Report[]>> {
       const result = await client.get<AdminDataResponse>("/api/admin/data", {
-        headers: { "x-admin-token": token },
+        headers: { [ADMIN_TOKEN_HEADER]: token },
       });
 
       if (!result.ok) {

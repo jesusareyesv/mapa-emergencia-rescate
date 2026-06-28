@@ -4,21 +4,31 @@ import { useState, type FormEvent } from "react";
 import { Input, Button } from "@repo/ui";
 
 export interface LoginFormProps {
+  /** Called with the typed password when the form is submitted. May throw on auth error. */
   onSubmit: (password: string) => Promise<void>;
-  error?: string | null;
-  pending?: boolean;
 }
 
 /**
- * Presentational login form built from @repo/ui atoms.
- * Owns local password state; delegates auth logic to onSubmit.
+ * Login form built from @repo/ui atoms.
+ * Owns password, pending, and error state; delegates auth logic to onSubmit.
+ * An onSubmit rejection is caught and shown as a Spanish error message.
  */
-export function LoginForm({ onSubmit, error, pending = false }: LoginFormProps) {
+export function LoginForm({ onSubmit }: LoginFormProps) {
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    await onSubmit(password);
+    setError(null);
+    setPending(true);
+    try {
+      await onSubmit(password);
+    } catch {
+      setError("Credenciales inválidas. Inténtalo de nuevo.");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (

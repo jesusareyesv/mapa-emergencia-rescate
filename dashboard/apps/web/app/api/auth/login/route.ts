@@ -19,10 +19,9 @@
 import { NextResponse } from "next/server";
 import { createHttpClient } from "../../../../src/shared/http/http-client";
 import { getApiBaseUrl } from "../../../../src/config/api-registry";
+import { BFF_CACHE_HEADERS } from "../../_shared/bff-cache";
 
 export const dynamic = "force-dynamic";
-
-const HEADERS = { "Cache-Control": "no-store" };
 
 export async function POST(request: Request): Promise<NextResponse> {
   // --- 1. Parse and validate body ---
@@ -30,7 +29,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400, headers: HEADERS });
+    return NextResponse.json(
+      { error: "Invalid JSON body" },
+      { status: 400, headers: BFF_CACHE_HEADERS },
+    );
   }
 
   const passwordCandidate =
@@ -41,7 +43,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (typeof passwordCandidate !== "string" || passwordCandidate.length === 0) {
     return NextResponse.json(
       { error: "password is required and must be a non-empty string" },
-      { status: 400, headers: HEADERS },
+      { status: 400, headers: BFF_CACHE_HEADERS },
     );
   }
 
@@ -49,19 +51,22 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // --- 2. Forward to emergency API via HttpClient ---
   const client = createHttpClient({ baseUrl: getApiBaseUrl("emergency") });
-  const result = await client.post("/api/admin/login", { password });
+  const result = await client.post<{ ok: boolean }>("/api/admin/login", { password });
 
   // --- 3. Map Result → HTTP ---
   if (result.ok) {
-    return NextResponse.json({ ok: true }, { status: 200, headers: HEADERS });
+    return NextResponse.json({ ok: true }, { status: 200, headers: BFF_CACHE_HEADERS });
   }
 
   if (result.error.kind === "auth") {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401, headers: HEADERS });
+    return NextResponse.json(
+      { error: "Invalid credentials" },
+      { status: 401, headers: BFF_CACHE_HEADERS },
+    );
   }
 
   return NextResponse.json(
     { error: "Authentication service returned an unexpected error." },
-    { status: 502, headers: HEADERS },
+    { status: 502, headers: BFF_CACHE_HEADERS },
   );
 }

@@ -6,19 +6,12 @@
  * needs updating if the API changes.
  */
 
+import { REPORT_TYPES } from "../domain/report";
 import type { Report, ReportType } from "../domain/report";
 import type { Result } from "../../../shared/result";
 import { ok, err } from "../../../shared/result";
 
-const VALID_TYPES = new Set<string>([
-  "critical",
-  "supplies",
-  "shelter",
-  "nopower",
-  "missing",
-  "building",
-  "starlink",
-]);
+const VALID_TYPES = new Set<string>(REPORT_TYPES);
 
 function parseString(value: unknown, field: string): Result<string> {
   if (typeof value !== "string") {

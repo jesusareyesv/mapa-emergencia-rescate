@@ -61,7 +61,7 @@ describe("toReport", () => {
     expect(result.error.kind).toBe("parse");
   });
 
-  it("returns err with kind=parse for non-null object input", () => {
+  it("returns err with kind=parse for null input", () => {
     const result = toReport(null);
 
     expect(result.ok).toBe(false);

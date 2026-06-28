@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { LoginForm } from "@/src/shared/auth/login-form";
@@ -26,20 +26,47 @@ describe("LoginForm", () => {
     expect(handleSubmit).toHaveBeenCalledWith("mypassword");
   });
 
-  it("displays the error prop when provided", () => {
-    render(<LoginForm onSubmit={vi.fn()} error="Credenciales inválidas. Inténtalo de nuevo." />);
-    expect(screen.getByText(/credenciales inválidas/i)).toBeInTheDocument();
+  it("shows error message after onSubmit rejects", async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn().mockRejectedValue(new Error("401"));
+
+    render(<LoginForm onSubmit={handleSubmit} />);
+
+    await user.type(screen.getByLabelText("Contraseña"), "wrong");
+    await user.click(screen.getByRole("button", { name: /entrar/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/credenciales inválidas/i)).toBeInTheDocument();
+    });
   });
 
-  it("does not display an error when error is null", () => {
-    render(<LoginForm onSubmit={vi.fn()} error={null} />);
+  it("does not display an error before any submission", () => {
+    render(<LoginForm onSubmit={vi.fn()} />);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("disables the button and shows 'Entrando...' when pending", () => {
-    render(<LoginForm onSubmit={vi.fn()} pending />);
-    const button = screen.getByRole("button", { name: /entrando/i });
-    expect(button).toBeDisabled();
+  it("disables the button and shows 'Entrando...' while onSubmit is in progress", async () => {
+    const user = userEvent.setup();
+    let resolve!: () => void;
+    const handleSubmit = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolve = res;
+        }),
+    );
+
+    render(<LoginForm onSubmit={handleSubmit} />);
+
+    await user.type(screen.getByLabelText("Contraseña"), "pass");
+    await user.click(screen.getByRole("button", { name: /entrar/i }));
+
+    expect(screen.getByRole("button", { name: /entrando/i })).toBeDisabled();
+
+    // Clean up: resolve the promise so the component settles
+    resolve();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /entrar/i })).toBeInTheDocument();
+    });
   });
 
   it("uses the Input atom (no raw <input> with hand-rolled Tailwind)", () => {

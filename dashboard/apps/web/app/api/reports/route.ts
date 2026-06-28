@@ -13,29 +13,36 @@ import { NextResponse } from "next/server";
 import { getAdminToken } from "../../../src/shared/auth/admin-token";
 import { listReports } from "../../../src/contexts/reports/application/list-reports";
 import { createHttpReportsGateway } from "../../../src/contexts/reports/infrastructure/http-reports-gateway";
+import { BFF_CACHE_HEADERS } from "../_shared/bff-cache";
 
 export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
-
-const HEADERS = { "Cache-Control": "no-store" };
 
 export async function GET(request: Request): Promise<NextResponse> {
   const token = getAdminToken(request);
   if (token === null) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: HEADERS });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: BFF_CACHE_HEADERS },
+    );
   }
 
   const gateway = createHttpReportsGateway();
   const result = await listReports(gateway, token);
 
   if (result.ok) {
-    return NextResponse.json(result.value, { status: 200, headers: HEADERS });
+    return NextResponse.json(result.value, { status: 200, headers: BFF_CACHE_HEADERS });
   }
 
   const { kind } = result.error;
   if (kind === "auth") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: HEADERS });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: BFF_CACHE_HEADERS },
+    );
   }
 
-  return NextResponse.json({ error: "Upstream service error" }, { status: 502, headers: HEADERS });
+  return NextResponse.json(
+    { error: "Upstream service error" },
+    { status: 502, headers: BFF_CACHE_HEADERS },
+  );
 }

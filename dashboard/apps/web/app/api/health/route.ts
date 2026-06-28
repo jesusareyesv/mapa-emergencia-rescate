@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-
-// Force dynamic so Next never pre-renders/caches this route at build time.
-export const dynamic = "force-dynamic";
+import { BFF_CACHE_HEADERS } from "../_shared/bff-cache";
 
 /**
  * Kubernetes liveness / readiness probe.
@@ -11,11 +9,5 @@ export const dynamic = "force-dynamic";
  * the error in the UI, not a traffic-less pod.
  */
 export function GET(): NextResponse {
-  return NextResponse.json(
-    { ok: true },
-    {
-      status: 200,
-      headers: { "Cache-Control": "no-store" },
-    },
-  );
+  return NextResponse.json({ ok: true }, { status: 200, headers: BFF_CACHE_HEADERS });
 }

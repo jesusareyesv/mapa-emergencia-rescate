@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { ADMIN_TOKEN_HEADER } from "../../../shared/auth/admin-token";
 import type { Report } from "../domain/report";
 
 export class UnauthorizedError extends Error {
@@ -11,9 +12,11 @@ export class UnauthorizedError extends Error {
   }
 }
 
+const REPORTS_POLL_INTERVAL_MS = 7000;
+
 async function fetchReports(token: string): Promise<Report[]> {
   const response = await fetch("/api/reports", {
-    headers: { "x-admin-token": token },
+    headers: { [ADMIN_TOKEN_HEADER]: token },
   });
 
   if (response.status === 401) {
@@ -29,9 +32,9 @@ async function fetchReports(token: string): Promise<Report[]> {
 
 export function useReports(token: string) {
   return useQuery<Report[], Error>({
-    queryKey: ["reports", token],
+    queryKey: ["reports"],
     queryFn: () => fetchReports(token),
-    refetchInterval: 7000,
+    refetchInterval: REPORTS_POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
     enabled: Boolean(token),
   });
