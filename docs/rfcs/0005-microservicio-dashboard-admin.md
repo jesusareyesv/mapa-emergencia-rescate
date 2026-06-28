@@ -110,7 +110,7 @@ apps/web/
   src/
     config/api-registry.ts       # registro declarativo de APIs
     shared/
-      http/http-client.ts        # cliente fetch por API (baseUrl, headers, ETag, errores)
+      http/http-client.ts        # cliente fetch por API (baseUrl, auth, get/post, errores→Result)
       auth/                      # lectura del token de sesión y guard de rutas BFF
       result.ts                  # Result<T,E> para errores explícitos
     contexts/
@@ -149,8 +149,9 @@ export type ApiId = keyof typeof API_REGISTRY;
 ```
 
 `HttpClient` es una pieza por entrada del registry: fija `baseUrl`, aplica la
-estrategia de auth, envía `If-None-Match`/lee `ETag` y normaliza errores a
-`Result`. Cada contexto recibe el cliente de **su** API por inyección.
+estrategia de auth (`get`/`post`) y normaliza errores a `Result` (nunca lanza).
+Cada contexto recibe el cliente de **su** API por inyección. (`patch`/`delete` se
+añadirán con las acciones de F4, cuando haya callers.)
 
 Flujo con BFF (elimina CORS; cada gateway corre en servidor):
 
@@ -186,14 +187,15 @@ registry salvo que su contrato exija otra cosa.
 Extraído de lo que ya existe (Tailwind v4, paleta slate/emerald/red…), sin
 inventar estética nueva:
 
-- **tokens**: color, spacing, tipografía, radios, sombras.
-- **atoms**: Button, Badge, Input/SearchInput, Card, Spinner, Thumbnail.
-- **molecules**: MetricCard, SearchBar, TabBar, StatPill, EmptyState.
-- **organisms genéricos**: DataTable, ListPanel, AppHeader.
+Construido hasta ahora: **tokens** mínimos (clases semánticas) y **atoms**
+`Button`, `Input`, `MetricCard`. Pendiente (F2): más atoms (Badge, Card, Spinner,
+Thumbnail), molecules (SearchBar, TabBar, StatPill, EmptyState) y organisms
+genéricos (DataTable, ListPanel, AppHeader).
 
-Regla dura: `packages/ui` **no conoce el dominio**. Los organisms con lógica de
-negocio (p. ej. `ReportsTable`) viven en la app (`contexts/*/ui`) y se componen
-con piezas de `ui`.
+Regla dura: `packages/ui` **no conoce el dominio** (vigilado por lint). Los
+organisms con lógica de negocio (p. ej. `ReportsTable`) viven en la app
+(`contexts/*/ui`) y se componen con piezas de `ui`. Los tests viven en `tests/`
+por workspace (convención del equipo), no colocados.
 
 ### Estado de servidor — TanStack Query
 
