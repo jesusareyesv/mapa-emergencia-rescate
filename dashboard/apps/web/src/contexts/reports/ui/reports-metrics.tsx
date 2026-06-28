@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { MetricCard } from "@repo/ui";
 import { useReports, UnauthorizedError } from "./use-reports";
+import { computeReportMetrics } from "../domain/report-metrics";
 
 interface ReportsMetricsProps {
   token: string;
@@ -26,13 +27,7 @@ export function ReportsMetrics({ token, onUnauthorized }: ReportsMetricsProps) {
     return <p>Error al cargar los reportes.</p>;
   }
 
-  const total = reports.length;
-  const totalAffected = reports.reduce((sum, r) => sum + r.affected, 0);
-  const byType = reports.reduce<Record<string, number>>((acc, r) => {
-    acc[r.type] = (acc[r.type] ?? 0) + 1;
-    return acc;
-  }, {});
-  const criticalCount = byType["critical"] ?? 0;
+  const { total, totalAffected, criticalCount } = computeReportMetrics(reports);
 
   return (
     <section aria-label="Métricas de reportes">

@@ -15,47 +15,77 @@ const BASE_DTO = {
 };
 
 describe("toReport", () => {
-  it("maps a complete DTO to a Report domain object", () => {
-    const report = toReport(BASE_DTO);
+  it("maps a complete DTO to ok(Report)", () => {
+    const result = toReport(BASE_DTO);
 
-    expect(report.id).toBe("report-1");
-    expect(report.type).toBe("critical");
-    expect(report.lat).toBe(39.47);
-    expect(report.lng).toBe(-0.38);
-    expect(report.place).toBe("Valencia centre");
-    expect(report.affected).toBe(5);
-    expect(report.needs).toBe("Water and food");
-    expect(report.photoUrl).toBe("/api/photos/report-1");
-    expect(report.confirmations).toBe(3);
-    expect(report.createdAt).toBe(1700000000000);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.id).toBe("report-1");
+    expect(result.value.type).toBe("critical");
+    expect(result.value.lat).toBe(39.47);
+    expect(result.value.lng).toBe(-0.38);
+    expect(result.value.place).toBe("Valencia centre");
+    expect(result.value.affected).toBe(5);
+    expect(result.value.needs).toBe("Water and food");
+    expect(result.value.photoUrl).toBe("/api/photos/report-1");
+    expect(result.value.confirmations).toBe(3);
+    expect(result.value.createdAt).toBe(1700000000000);
   });
 
-  it("maps photoUrl: null to null on the domain object", () => {
+  it("maps photoUrl: null to ok(Report) with photoUrl null", () => {
     const dto = { ...BASE_DTO, photoUrl: null };
-    const report = toReport(dto);
+    const result = toReport(dto);
 
-    expect(report.photoUrl).toBeNull();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.photoUrl).toBeNull();
   });
 
   it("ignores extra/unknown fields in the DTO", () => {
     const dtoWithExtras = { ...BASE_DTO, extraField: "should-be-ignored", anotherExtra: 42 };
-    const report = toReport(dtoWithExtras);
+    const result = toReport(dtoWithExtras);
 
-    expect(report).not.toHaveProperty("extraField");
-    expect(report).not.toHaveProperty("anotherExtra");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).not.toHaveProperty("extraField");
+    expect(result.value).not.toHaveProperty("anotherExtra");
   });
 
-  it("throws when id is missing", () => {
+  it("returns err with kind=parse when id is missing", () => {
     const { id: _id, ...dtoWithoutId } = BASE_DTO;
-    expect(() => toReport(dtoWithoutId)).toThrow();
+    const result = toReport(dtoWithoutId);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.kind).toBe("parse");
   });
 
-  it("maps all valid ReportType values", () => {
+  it("returns err with kind=parse for non-null object input", () => {
+    const result = toReport(null);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.kind).toBe("parse");
+  });
+
+  it("returns err with kind=parse for unknown ReportType", () => {
+    const dto = { ...BASE_DTO, type: "not-a-real-type" };
+    const result = toReport(dto);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.kind).toBe("parse");
+  });
+
+  it("maps all valid ReportType values to ok", () => {
     const types = ["critical", "supplies", "shelter", "nopower", "missing", "building", "starlink"];
     for (const type of types) {
       const dto = { ...BASE_DTO, type };
-      const report = toReport(dto);
-      expect(report.type).toBe(type);
+      const result = toReport(dto);
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.value.type).toBe(type);
     }
   });
 });

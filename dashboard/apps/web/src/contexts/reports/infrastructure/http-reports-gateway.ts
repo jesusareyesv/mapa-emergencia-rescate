@@ -3,6 +3,10 @@
  *
  * Calls GET /api/admin/data on the emergency API, extracts the `reports`
  * array, and maps each item to a domain Report via report-mapper.
+ *
+ * All error paths return Result — no throw in this layer.
+ * The only sanctioned throw in this context is the React Query boundary
+ * in use-reports.ts, required by TanStack Query's error contract.
  */
 
 import { createHttpClient } from "../../../shared/http/http-client";
@@ -38,13 +42,16 @@ export function createHttpReportsGateway(): ReportsGateway {
         return err({ kind: "parse", message: "admin data response missing reports array" });
       }
 
-      try {
-        const reports: Report[] = rawReports.map((item) => toReport(item));
-        return { ok: true, value: reports };
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "Failed to map reports";
-        return err({ kind: "parse", message });
+      const reports: Report[] = [];
+      for (const item of rawReports) {
+        const mapped = toReport(item);
+        if (!mapped.ok) {
+          return mapped;
+        }
+        reports.push(mapped.value);
       }
+
+      return { ok: true, value: reports };
     },
   };
 }
