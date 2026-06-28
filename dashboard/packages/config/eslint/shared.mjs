@@ -63,7 +63,24 @@ export const vitestConfig = {
   languageOptions: vitest.configs.env.languageOptions,
 };
 
-/** All three shared configs as a flat array — spread into the consumer's config. */
-const sharedConfigs = [domainApplicationBoundary, uiBoundary, vitestConfig];
+// Disable the core no-unused-vars rule for TS files so that
+// @typescript-eslint/no-unused-vars (enabled via typescript-eslint/eslint-config-next)
+// is the sole authority on unused variables in TypeScript.  Must be placed after
+// js.configs.recommended so it overrides the core rule rather than the TS one.
+export const tsNoUnusedVarsOverride = {
+  name: "repo/ts-no-unused-vars-override",
+  files: ["**/*.{ts,tsx}"],
+  rules: {
+    "no-unused-vars": "off",
+  },
+};
+
+/** All shared configs as a flat array — spread into the consumer's config. */
+const sharedConfigs = [
+  domainApplicationBoundary,
+  uiBoundary,
+  vitestConfig,
+  tsNoUnusedVarsOverride,
+];
 
 export default sharedConfigs;
