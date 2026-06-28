@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb, hasDbEnv, schema } from "./drizzle";
+import { getPublicSupplySummariesForHospitals } from "./hospital-supplies";
 import hospitalsSeed from "./data/hospitals-seed.json";
 import {
   HOSPITAL_FACILITY_TYPES,
@@ -22,23 +23,29 @@ export * from "./hospitals-meta";
 
 const { hospitals, hospitalPatients } = schema;
 
-let _seedDone = false;
+// Promesa in-flight compartida: si dos requests concurrentes disparan el seed,
+// ambas esperan la MISMA promesa en vez de sembrar dos veces. Se marca "hecho"
+// solo tras éxito (audit A-1: antes _seedDone=true se ponía antes del loop, así
+// que un fallo dejaba el seed marcado como completo a medias).
+let _seedPromise: Promise<void> | null = null;
 
 async function seedHospitalsIfNeeded(): Promise<void> {
-  if (_seedDone) return;
-  _seedDone = true;
-  const rows = await getDb()
-    .select({ count: sql<number>`COUNT(*)::int` })
-    .from(hospitals)
-    .where(sql`${hospitals.externalId} IS NOT NULL`);
-  const count = Number(rows[0]?.count ?? 0);
-  if (count >= hospitalsSeed.length) return;
+  if (_seedPromise) return _seedPromise;
+  _seedPromise = (async () => {
+    const rows = await getDb()
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(hospitals)
+      .where(sql`${hospitals.externalId} IS NOT NULL`);
+    const count = Number(rows[0]?.count ?? 0);
+    if (count >= hospitalsSeed.length) return;
 
-  for (const h of hospitalsSeed) {
-    try {
-      await getDb()
-        .insert(hospitals)
-        .values({
+    // UN solo INSERT multi-fila en vez de 174 round-trips seriales en el request
+    // path (audit A-1). ON CONFLICT (external_id) DO NOTHING lo hace idempotente.
+    const now = Date.now();
+    await getDb()
+      .insert(hospitals)
+      .values(
+        hospitalsSeed.map((h) => ({
           id: crypto.randomUUID(),
           externalId: h.externalId,
           name: h.name,
@@ -49,18 +56,20 @@ async function seedHospitalsIfNeeded(): Promise<void> {
           level: h.level,
           priorityZone: h.priorityZone,
           isPriority: h.isPriority,
-          createdAt: Date.now(),
-        })
-        // ON CONFLICT (external_id) WHERE external_id IS NOT NULL DO NOTHING
-        // (target del índice único parcial).
-        .onConflictDoNothing({
-          target: hospitals.externalId,
-          where: sql`${hospitals.externalId} IS NOT NULL`,
-        });
-    } catch {
-      // un fallo puntual no detiene el resto
-    }
-  }
+          createdAt: now,
+        })),
+      )
+      .onConflictDoNothing({
+        target: hospitals.externalId,
+        where: sql`${hospitals.externalId} IS NOT NULL`,
+      });
+  })().catch((err) => {
+    // En error, liberamos la promesa para reintentar en la próxima request en
+    // vez de quedar marcado como sembrado a medias.
+    _seedPromise = null;
+    throw err;
+  });
+  return _seedPromise;
 }
 
 // Fila agregada que devuelven las consultas de hospitales (con conteo de
@@ -86,6 +95,17 @@ function rowToHospital(row: HospitalRow): Hospital {
     totalPatients: Number(row.totalPatients ?? 0),
     createdAt: Number(row.createdAt),
   };
+}
+
+async function withSupplySummaries(hospitalsList: Hospital[]): Promise<Hospital[]> {
+  if (hospitalsList.length === 0) return hospitalsList;
+  const summaries = await getPublicSupplySummariesForHospitals(
+    hospitalsList.map((h) => h.id),
+  );
+  return hospitalsList.map((hospital) => ({
+    ...hospital,
+    supplySummary: summaries.get(hospital.id),
+  }));
 }
 
 function normalizeFacilityType(v: string | null | undefined): HospitalFacilityType {
@@ -149,6 +169,7 @@ export interface ListHospitalsOptions {
   priorityZone?: HospitalPriorityZone | "all";
   search?: string;
   limit?: number;
+  includeSupplySummary?: boolean;
 }
 
 export async function listHospitals(
@@ -196,7 +217,10 @@ export async function listHospitals(
       LIMIT ${limit}
     `);
     const rows = (Array.isArray(result) ? result : result.rows) as HospitalRow[];
-    return rows.map(rowToHospital);
+    const hospitalsList = rows.map(rowToHospital);
+    return options.includeSupplySummary
+      ? withSupplySummaries(hospitalsList)
+      : hospitalsList;
   }
 
   ensureMemorySeed();
@@ -235,7 +259,10 @@ export async function listHospitals(
     if (a.state !== b.state) return a.state.localeCompare(b.state);
     return a.name.localeCompare(b.name);
   });
-  return list.slice(0, limit);
+  const hospitalsList = list.slice(0, limit);
+  return options.includeSupplySummary
+    ? withSupplySummaries(hospitalsList)
+    : hospitalsList;
 }
 
 export async function listStates(): Promise<string[]> {
@@ -256,7 +283,10 @@ export async function listStates(): Promise<string[]> {
   return [...set].sort();
 }
 
-export async function getHospital(id: string): Promise<Hospital | null> {
+export async function getHospital(
+  id: string,
+  options: { includeSupplySummary?: boolean } = {},
+): Promise<Hospital | null> {
   if (hasDbEnv()) {
     await seedHospitalsIfNeeded();
     const result = await getDb().execute(sql`
@@ -273,7 +303,12 @@ export async function getHospital(id: string): Promise<Hospital | null> {
       GROUP BY h.id
     `);
     const rows = (Array.isArray(result) ? result : result.rows) as HospitalRow[];
-    if (rows[0]) return rowToHospital(rows[0]);
+    if (rows[0]) {
+      const hospital = rowToHospital(rows[0]);
+      return options.includeSupplySummary
+        ? (await withSupplySummaries([hospital]))[0]
+        : hospital;
+    }
 
     const hospitalsList = await listHospitals({ limit: 1000 });
     return hospitalsList.find((h) => matchesHospitalSlug(h, id)) ?? null;
@@ -285,14 +320,17 @@ export async function getHospital(id: string): Promise<Hospital | null> {
       matchesHospitalSlug(hospital, id),
     );
     if (!match) return null;
-    return getHospital(match.id);
+    return getHospital(match.id, options);
   }
   const patients = [...memoryPatients.values()].filter((p) => p.hospitalId === id);
-  return {
+  const hospital = {
     ...h,
     activePatients: patients.filter((p) => p.status === "hospitalized").length,
     totalPatients: patients.length,
   };
+  return options.includeSupplySummary
+    ? (await withSupplySummaries([hospital]))[0]
+    : hospital;
 }
 
 export async function addHospital(input: NewHospital): Promise<Hospital> {
@@ -348,6 +386,7 @@ export interface PatientSearchResult {
   };
 }
 
+
 // Fila de paciente con columnas del hospital adjuntas (búsqueda global).
 type PatientWithHospitalRow = typeof hospitalPatients.$inferSelect & {
   hospitalName: string;
@@ -376,9 +415,13 @@ function rowToSearchResult(r: PatientWithHospitalRow): PatientSearchResult {
 export async function searchPatients(
   query: string,
   limit: number = 50,
+  opts: { publicSafe?: boolean } = {},
 ): Promise<PatientSearchResult[]> {
   const q = (query ?? "").trim();
   const cleanLimit = Math.min(Math.max(limit, 1), 200);
+  // publicSafe: solo busca por nombre (no por notas/contacto/cédula) para que un
+  // caller anónimo no pueda enumerar por cédula o teléfono parcial. Ver C-1.
+  const publicSafe = opts.publicSafe ?? false;
 
   if (hasDbEnv()) {
     await seedHospitalsIfNeeded();
@@ -419,14 +462,19 @@ export async function searchPatients(
     const digits = q.replace(/[^0-9]/g, "");
     const digitsLike = digits.length >= 4 ? `%${digits}%` : null;
 
+    // publicSafe: WHERE solo por nombre. Sin publicSafe (admin) se busca también
+    // por notas/contacto/cédula para la herramienta interna.
+    const whereSql = publicSafe
+      ? sql`WHERE LOWER(p.name) LIKE ${like}`
+      : sql`WHERE
+          LOWER(p.name) LIKE ${like}
+          OR LOWER(p.notes) LIKE ${like}
+          OR LOWER(p.contact) LIKE ${like}
+          OR (${digitsLike}::text IS NOT NULL
+              AND REGEXP_REPLACE(p.notes, '[^0-9]', '', 'g') LIKE ${digitsLike})`;
     const result = await getDb().execute(sql`
       ${baseSelect}
-      WHERE
-        LOWER(p.name) LIKE ${like}
-        OR LOWER(p.notes) LIKE ${like}
-        OR LOWER(p.contact) LIKE ${like}
-        OR (${digitsLike}::text IS NOT NULL
-            AND REGEXP_REPLACE(p.notes, '[^0-9]', '', 'g') LIKE ${digitsLike})
+      ${whereSql}
       ORDER BY
         CASE WHEN LOWER(p.name) LIKE ${like} THEN 0 ELSE 1 END,
         p.admitted_at DESC

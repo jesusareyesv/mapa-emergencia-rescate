@@ -1,4 +1,4 @@
-# 0003 — Microservicio del dashboard de administración (multi-API)
+# 0005 — Microservicio del dashboard de administración (multi-API)
 
 > Estado: propuesta · Autor: Victor · Relacionado: — (sustituye al panel
 > embebido en `app/admin/AdminDashboard.tsx`)

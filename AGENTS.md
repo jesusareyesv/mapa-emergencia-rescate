@@ -10,6 +10,9 @@ las reglas que un agente necesita antes de editar.
 - Lee `README.md`, `CONTRIBUTING.md` y el archivo que vas a modificar.
 - Si el cambio toca arquitectura, sincronización, datos o flujos públicos,
   revisa también `docs/README.md` y los ADR/RFC relacionados.
+- Si el cambio toca UI pública, estilos, layout, componentes visuales o copy de
+  experiencia, revisa `design/DESIGN.md` antes de editar y conserva sus tokens
+  y criterios como fuente de verdad visual.
 - Trabaja desde una rama nueva basada en `main`. Si no eres maintainer, usa el
   flujo fork-first descrito en `CONTRIBUTING.md`.
 - No reescribas historial, no borres ramas ajenas y no reviertas cambios que no
@@ -89,6 +92,37 @@ npm run build
 - Para SQL que el query builder no expresa (CTEs, trigram, FILTER), usa el
   escape `sql\`...\`` de drizzle-orm; preserva la semántica exacta.
 
+### Crear un endpoint — patrón OBLIGATORIO
+
+Todo route en `app/api/**` DEBE seguir este patrón. `npm run endpoints:check`
+(corre en `prebuild` y CI) FALLA el build si no se cumplen las reglas duras.
+
+**Reglas DURAS (rompen el build):**
+
+1. **Handler `async`.** Siempre `export async function GET|POST|...`, nunca
+   `export function`. Los handlers hacen I/O.
+2. **Nada de I/O largo de terceros inline.** Prohibido `export const maxDuration`.
+   Si el trabajo tarda (crawl, geocode, reporte pesado, llamada a IA/API
+   externa), se ENCOLA en una cola BullMQ y el handler devuelve `202 {jobId}`;
+   el cliente consulta el estado por status-poll. Patrón:
+   `worker/sourcesSync.queue.ts` + `app/api/sync/run/route.ts` +
+   `app/api/sync/status/route.ts`.
+3. **Nada de llamadas síncronas bloqueantes** (`readFileSync`, `execSync`, …) en
+   el request path; usa variantes async o muévelo a un worker.
+4. **Bloque `@swagger`** sobre el primer handler (ver abajo).
+
+**Reglas RECOMENDADAS (avisos, con excepción vía `// endpoint-check: ok`):**
+
+5. **Lecturas:** awaits independientes en paralelo con `Promise.all` (no en
+   cascada). GET público polleado → `cached(key, ttl, fn)` + `jsonWithEtag(...)`
+   (corto-circuito 304). Ejemplos: `app/api/reports`, `app/api/missing`,
+   `app/api/chat`.
+6. **Escrituras / mutaciones:** valida en servidor (`readJson` + `BODY_LIMIT_*`),
+   y protege con auth (`isAdminRequest` / token POC) o `checkRateLimit(clientIp(...))`.
+   Si persistes la IP, hashéala con `hashIp(request)` (NUNCA IP cruda).
+7. **No serialices el objeto completo** a respuestas públicas; expón solo los
+   campos permitidos (allowlist de DTO).
+
 ### Documentar el endpoint (OpenAPI/Swagger) — OBLIGATORIO
 
 Cada route en `app/api/**` se auto-registra en la doc Swagger **solo si lleva un
@@ -105,6 +139,9 @@ modificar un endpoint:
    `public/openapi.json`) y se sirve en **`/api/docs`** (Swagger UI) y
    `/api/openapi` (JSON). Verifica local: `npm run openapi` y revisa el conteo
    de paths. Un endpoint sin `@swagger` NO aparece en la doc.
+4. **Enforcement:** `npm run endpoints:check` (corre en `prebuild` y en CI) FALLA
+   el build si un `route.ts` no tiene `@swagger` (o viola las reglas duras de
+   arriba). No se puede mergear un endpoint sin documentar ni fuera de patrón.
 
 Guía completa con ejemplo: `docs/guides/documentar-endpoints-openapi.md`.
 
@@ -116,6 +153,7 @@ app/components/          UI pública y formularios
 app/api/                 Superficie HTTP pública/admin/sync
 lib/                     Tipos, acceso a datos, cache, sync, rate-limit, helpers
 docs/                    RFCs, ADRs, arquitectura y guías operativas
+design/                  Sistema visual, tokens y criterios en DESIGN.md
 scripts/                 Importaciones y tareas manuales
 public/                  Imágenes, iconos, service worker y assets estáticos
 .github/                 Templates, workflows y automatización de GitHub
