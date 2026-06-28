@@ -15,14 +15,33 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { id } = await params;
   const hospital = await getHospital(id);
-  if (!hospital) return { title: "Hospital no encontrado · Mapa de Emergencia" };
+
+  if (!hospital)
+    return { title: "Hospital no encontrado · Mapa de Emergencia" };
+
+  const title = `${hospital.name} · Hospitales · Mapa de Emergencia Venezuela`;
+  const description = `Información, pacientes registrados y datos del ${hospital.name} en ${hospital.state}. Iniciativa ciudadana, independiente y no gubernamental.`;
+  const url = `/hospitales/${buildHospitalSlug(hospital)}`;
   return {
-    title: `${hospital.name} · Hospitales · Mapa de Emergencia Venezuela`,
-    description: `Información, pacientes registrados y datos del ${hospital.name} en ${hospital.state}.`,
-    alternates: { canonical: `/hospitales/${buildHospitalSlug(hospital)}` },
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 
@@ -94,8 +113,16 @@ export default async function HospitalPage({ params }: PageProps) {
           )}
 
           <div className="mt-5 grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3">
-            <Stat label="Hospitalizados" value={hospital.activePatients} accent="#1d4ed8" />
-            <Stat label="Total pacientes" value={hospital.totalPatients} accent="#0f172a" />
+            <Stat
+              label="Hospitalizados"
+              value={hospital.activePatients}
+              accent="#1d4ed8"
+            />
+            <Stat
+              label="Total pacientes"
+              value={hospital.totalPatients}
+              accent="#0f172a"
+            />
             <Stat label="Zona" value={zone.label} accent={zone.color} />
           </div>
         </div>
@@ -107,10 +134,10 @@ export default async function HospitalPage({ params }: PageProps) {
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-semibold">⚠️ Importante</p>
           <p className="mt-1 leading-relaxed">
-            Los datos de pacientes son reportes ciudadanos no verificados. Sirven
-            para ayudar a familiares a localizar a sus seres queridos. Si vas a
-            registrar a alguien, confirma que cuentas con su autorización o la de
-            un familiar directo. Si encuentras información incorrecta o
+            Los datos de pacientes son reportes ciudadanos no verificados.
+            Sirven para ayudar a familiares a localizar a sus seres queridos. Si
+            vas a registrar a alguien, confirma que cuentas con su autorización
+            o la de un familiar directo. Si encuentras información incorrecta o
             desactualizada, contáctanos.
           </p>
         </div>
