@@ -1,0 +1,85 @@
+# Dashboard Deployment — Next.js standalone admin microfrontend.
+# Independent service alongside the emergencies app; same namespace (mapa),
+# different selector (app: dashboard — NOT app: mapa) to avoid pod overlap.
+#
+# Zero-downtime mirrors the root pattern (infra/k8s/deployment.yaml):
+#   - strategy maxUnavailable:0 / maxSurge:1  -> new pod must become Ready
+#     BEFORE any old pod is removed. Always >=1 serving.
+#   - readinessProbe /api/health              -> "Ready" = app up; no DB so
+#     the probe is lightweight. Blocks traffic until warm.
+#   - terminationGracePeriodSeconds           -> in-flight requests drain
+#     before SIGKILL.
+#
+# No worker, no migrate job, no R2 upload — this service has no DB.
+# Resources are lower than the root app for the same reason.
+#
+# The image tag is patched per-deploy by CI: `kubectl set image ... :<sha>`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: mapa
+  labels:
+    app: dashboard
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: dashboard
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      # GHCR is private: pull secret created/refreshed by the deploy workflow.
+      imagePullSecrets:
+        - name: ghcr-pull
+      terminationGracePeriodSeconds: 40
+      containers:
+        - name: dashboard
+          # CI overwrites this tag with ghcr.io/<owner>/<repo>-dashboard:<sha>.
+          # `:latest` is only a placeholder so `kubectl apply` works first time.
+          image: ghcr.io/OWNER/REPO-dashboard:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: dashboard-config
+          # Liveness: is the process alive? (cheap, no DB) — restart if not.
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          # Readiness: can it serve? — gates traffic and the rolling update.
+          # successThreshold:2 mirrors root pattern ("2 consecutive 200s").
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 2
+            failureThreshold: 3
+          # Lower than the root app: no DB connection pool, no worker threads.
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              memory: "256Mi"
+          # Give in-flight requests a moment before SIGTERM during drain.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]
