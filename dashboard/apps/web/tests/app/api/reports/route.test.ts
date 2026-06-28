@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { server } from "@repo/config/vitest/setup";
-import { GET } from "./route";
+import { GET } from "@/app/api/reports/route";
 
 const TEST_API_URL = "http://test-emergency.example.com";
 

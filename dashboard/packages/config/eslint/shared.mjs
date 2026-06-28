@@ -14,9 +14,11 @@
 import vitest from "eslint-plugin-vitest";
 
 // 4a / 3a. domain + application layers: must not import from infrastructure or ui.
+// Excludes test files — tests may import any layer to wire up integration assertions.
 export const domainApplicationBoundary = {
   name: "repo/boundaries/domain-application",
   files: ["**/domain/**", "**/application/**"],
+  ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
   rules: {
     "no-restricted-imports": [
       "error",
@@ -34,9 +36,11 @@ export const domainApplicationBoundary = {
 };
 
 // 4b / 3b. ui layer: must not import from contexts (keep components domain-agnostic).
+// Excludes test files — tests are allowed to import from any layer for composition tests.
 export const uiBoundary = {
   name: "repo/boundaries/ui",
   files: ["**/ui/**"],
+  ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
   rules: {
     "no-restricted-imports": [
       "error",

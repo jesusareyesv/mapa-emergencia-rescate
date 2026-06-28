@@ -6,5 +6,8 @@ export default mergeConfig(
   base,
   defineConfig({
     plugins: [react()],
+    test: {
+      include: ["tests/**/*.test.{ts,tsx}"],
+    },
   }),
 );

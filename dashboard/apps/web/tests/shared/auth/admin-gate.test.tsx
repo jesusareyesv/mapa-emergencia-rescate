@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, beforeEach } from "vitest";
 import { server } from "@repo/config/vitest/setup";
-import { AdminGate } from "./admin-gate";
-import { renderWithProviders } from "../test-utils/render-with-providers";
+import { AdminGate } from "@/src/shared/auth/admin-gate";
+import { renderWithProviders } from "@/tests/_utils/render-with-providers";
 
 describe("AdminGate", () => {
   beforeEach(() => {

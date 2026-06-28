@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getApiBaseUrl } from "./api-registry";
+import { getApiBaseUrl } from "@/src/config/api-registry";
 
 describe("getApiBaseUrl", () => {
   afterEach(() => {

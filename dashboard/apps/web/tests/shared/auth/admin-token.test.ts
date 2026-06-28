@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ADMIN_TOKEN_HEADER, getAdminToken } from "./admin-token";
+import { ADMIN_TOKEN_HEADER, getAdminToken } from "@/src/shared/auth/admin-token";
 
 describe("getAdminToken", () => {
   it("returns the token value when x-admin-token header is present", () => {

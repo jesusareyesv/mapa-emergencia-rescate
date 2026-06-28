@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "@repo/config/vitest/setup";
-import { createHttpClient } from "./http-client";
+import { createHttpClient } from "@/src/shared/http/http-client";
 
 const BASE_URL = "http://test-api.example.com";
 

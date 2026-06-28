@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { server } from "@repo/config/vitest/setup";
-import { createHttpReportsGateway } from "./http-reports-gateway";
+import { createHttpReportsGateway } from "@/src/contexts/reports/infrastructure/http-reports-gateway";
 
 const TEST_API_URL = "http://test-emergency.example.com";
 const TEST_TOKEN = "valid-admin-token";

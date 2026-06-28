@@ -2,9 +2,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, beforeEach } from "vitest";
 import { server } from "@repo/config/vitest/setup";
-import { ReportsMetrics } from "./reports-metrics";
-import { AdminPanel } from "../../../../app/admin-panel";
-import { renderWithProviders } from "../../../shared/test-utils/render-with-providers";
+import { ReportsMetrics } from "@/src/contexts/reports/ui/reports-metrics";
+import { AdminPanel } from "@/app/admin-panel";
+import { renderWithProviders } from "@/tests/_utils/render-with-providers";
 
 const TOKEN_KEY = "dashboard:adminToken";
 

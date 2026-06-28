@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toReport } from "./report-mapper";
+import { toReport } from "@/src/contexts/reports/infrastructure/report-mapper";
 
 const BASE_DTO = {
   id: "report-1",

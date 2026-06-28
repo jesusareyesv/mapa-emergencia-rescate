@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { err, ok } from "./result";
-import type { ApiError, Result } from "./result";
+import { err, ok } from "@/src/shared/result";
+import type { ApiError, Result } from "@/src/shared/result";
 
 describe("Result", () => {
   it("ok() constructs a success result", () => {
