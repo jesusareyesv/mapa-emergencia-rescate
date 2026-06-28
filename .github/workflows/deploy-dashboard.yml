@@ -201,7 +201,7 @@ jobs:
           EMERGENCY_API_URL: ${{ vars.EMERGENCY_API_URL }}
         run: |
           set -euo pipefail
-          kubectl create configmap dashboard-config \
+          kubectl -n mapa create configmap dashboard-config \
             --from-literal=EMERGENCY_API_URL="${EMERGENCY_API_URL:-http://app.mapa.svc.cluster.local}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
