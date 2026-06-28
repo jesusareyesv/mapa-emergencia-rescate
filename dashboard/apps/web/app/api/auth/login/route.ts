@@ -2,17 +2,22 @@
  * BFF auth login passthrough.
  *
  * Receives { password } from the browser, forwards it to the emergency API's
- * /api/admin/login endpoint, and returns a minimal response.
+ * /api/admin/login endpoint via HttpClient, and returns a minimal response.
  *
  * - 200 { ok: true }  — emergency API accepted the password
  * - 401               — emergency API rejected the password
- * - 502               — emergency API is unreachable (network failure)
+ * - 502               — emergency API is unreachable or returned an unexpected error
  * - 400               — client sent an invalid request body
  *
  * Never leaks internal backend error details to the browser.
+ *
+ * Note: use-admin-session.ts (browser → this BFF, same-origin) is intentionally
+ * NOT routed through HttpClient — that hook calls its own BFF and is a different
+ * concern. HttpClient is for server → external API calls.
  */
 
 import { NextResponse } from "next/server";
+import { createHttpClient } from "../../../../src/shared/http/http-client";
 import { getApiBaseUrl } from "../../../../src/config/api-registry";
 
 export const dynamic = "force-dynamic";
@@ -42,36 +47,21 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const password = passwordCandidate;
 
-  // --- 2. Forward to emergency API ---
-  const baseUrl = getApiBaseUrl("emergency");
-  const url = `${baseUrl}/api/admin/login`;
+  // --- 2. Forward to emergency API via HttpClient ---
+  const client = createHttpClient({ baseUrl: getApiBaseUrl("emergency") });
+  const result = await client.post("/api/admin/login", { password });
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-  } catch {
-    // Network failure — do not expose internal details
-    return NextResponse.json(
-      { error: "Authentication service is unavailable. Please try again later." },
-      { status: 502, headers: HEADERS },
-    );
+  // --- 3. Map Result → HTTP ---
+  if (result.ok) {
+    return NextResponse.json({ ok: true }, { status: 200, headers: HEADERS });
   }
 
-  // --- 3. Map upstream status ---
-  if (upstream.status === 401) {
+  if (result.error.kind === "auth") {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401, headers: HEADERS });
   }
 
-  if (!upstream.ok) {
-    return NextResponse.json(
-      { error: "Authentication service returned an unexpected error." },
-      { status: 502, headers: HEADERS },
-    );
-  }
-
-  return NextResponse.json({ ok: true }, { status: 200, headers: HEADERS });
+  return NextResponse.json(
+    { error: "Authentication service returned an unexpected error." },
+    { status: 502, headers: HEADERS },
+  );
 }

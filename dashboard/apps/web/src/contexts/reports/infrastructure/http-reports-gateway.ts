@@ -32,13 +32,7 @@ export function createHttpReportsGateway(): ReportsGateway {
       }
 
       const payload = result.value;
-
-      // Guard: HttpClient models a 304 as a NotModified result; not expected here.
-      if ("notModified" in payload) {
-        return err({ kind: "parse", message: "Unexpected 304 response from admin data endpoint" });
-      }
-
-      const rawReports = (payload as AdminDataResponse).reports;
+      const rawReports = payload.reports;
 
       if (!Array.isArray(rawReports)) {
         return err({ kind: "parse", message: "admin data response missing reports array" });

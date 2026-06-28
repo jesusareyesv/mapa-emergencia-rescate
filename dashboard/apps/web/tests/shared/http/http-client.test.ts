@@ -6,7 +6,7 @@ import { createHttpClient } from "@/src/shared/http/http-client";
 const BASE_URL = "http://test-api.example.com";
 
 describe("HttpClient", () => {
-  describe("200 ok — returns parsed JSON", () => {
+  describe("get — 200 ok", () => {
     it("returns ok result with parsed body", async () => {
       server.use(http.get(`${BASE_URL}/data`, () => HttpResponse.json({ id: 1, name: "test" })));
 
@@ -20,7 +20,7 @@ describe("HttpClient", () => {
     });
   });
 
-  describe("401 auth error", () => {
+  describe("get — 401 auth error", () => {
     it("returns err with kind=auth and status=401", async () => {
       server.use(
         http.get(`${BASE_URL}/protected`, () =>
@@ -39,7 +39,7 @@ describe("HttpClient", () => {
     });
   });
 
-  describe("500 server error", () => {
+  describe("get — 500 server error", () => {
     it("returns err with kind=http and status=500", async () => {
       server.use(
         http.get(`${BASE_URL}/error`, () =>
@@ -58,44 +58,7 @@ describe("HttpClient", () => {
     });
   });
 
-  describe("304 not-modified (ETag)", () => {
-    it("returns ok result with notModified=true when server responds 304", async () => {
-      server.use(
-        http.get(`${BASE_URL}/resource`, ({ request }) => {
-          const ifNoneMatch = request.headers.get("If-None-Match");
-          if (ifNoneMatch === '"abc123"') {
-            return new HttpResponse(null, { status: 304 });
-          }
-          return HttpResponse.json({ data: "fresh" });
-        }),
-      );
-
-      const client = createHttpClient({ baseUrl: BASE_URL });
-      const result = await client.get("/resource", { etag: '"abc123"' });
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect((result.value as { notModified: boolean }).notModified).toBe(true);
-      }
-    });
-
-    it("sends If-None-Match header when etag is provided", async () => {
-      let capturedIfNoneMatch: string | null = null;
-      server.use(
-        http.get(`${BASE_URL}/resource`, ({ request }) => {
-          capturedIfNoneMatch = request.headers.get("If-None-Match");
-          return new HttpResponse(null, { status: 304 });
-        }),
-      );
-
-      const client = createHttpClient({ baseUrl: BASE_URL });
-      await client.get("/resource", { etag: '"etag-value"' });
-
-      expect(capturedIfNoneMatch).toBe('"etag-value"');
-    });
-  });
-
-  describe("network failure", () => {
+  describe("get — network failure", () => {
     it("returns err with kind=network when fetch rejects", async () => {
       server.use(http.get(`${BASE_URL}/offline`, () => HttpResponse.error()));
 
@@ -109,7 +72,7 @@ describe("HttpClient", () => {
     });
   });
 
-  describe("parse error — invalid JSON in 2xx body", () => {
+  describe("get — parse error — invalid JSON in 2xx body", () => {
     it("returns err with kind=parse when body is not valid JSON", async () => {
       server.use(
         http.get(
@@ -132,7 +95,7 @@ describe("HttpClient", () => {
     });
   });
 
-  describe("defaultHeaders", () => {
+  describe("get — defaultHeaders", () => {
     it("merges defaultHeaders into every request", async () => {
       let capturedAuth: string | null = null;
       server.use(
@@ -152,7 +115,7 @@ describe("HttpClient", () => {
     });
   });
 
-  describe("other non-ok status codes", () => {
+  describe("get — other non-ok status codes", () => {
     it("returns err with kind=http for 403", async () => {
       server.use(
         http.get(`${BASE_URL}/forbidden`, () =>
@@ -167,6 +130,121 @@ describe("HttpClient", () => {
       if (!result.ok) {
         expect(result.error.kind).toBe("http");
         expect(result.error.status).toBe(403);
+      }
+    });
+  });
+
+  // ── post ───────────────────────────────────────────────────────────────────
+
+  describe("post — 201 ok — body forwarded", () => {
+    it("returns ok result with parsed body and forwards JSON body", async () => {
+      let capturedBody: unknown;
+      server.use(
+        http.post(`${BASE_URL}/items`, async ({ request }) => {
+          capturedBody = await request.json();
+          return HttpResponse.json({ id: 42, created: true }, { status: 201 });
+        }),
+      );
+
+      const client = createHttpClient({ baseUrl: BASE_URL });
+      const result = await client.post<{ id: number; created: boolean }>("/items", {
+        name: "widget",
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toEqual({ id: 42, created: true });
+      }
+      expect(capturedBody).toEqual({ name: "widget" });
+    });
+
+    it("sets Content-Type: application/json on the request", async () => {
+      let capturedContentType: string | null = null;
+      server.use(
+        http.post(`${BASE_URL}/items`, ({ request }) => {
+          capturedContentType = request.headers.get("Content-Type");
+          return HttpResponse.json({ ok: true }, { status: 200 });
+        }),
+      );
+
+      const client = createHttpClient({ baseUrl: BASE_URL });
+      await client.post("/items", { value: 1 });
+
+      expect(capturedContentType).toContain("application/json");
+    });
+  });
+
+  describe("post — 401 → auth error", () => {
+    it("returns err with kind=auth and status=401", async () => {
+      server.use(
+        http.post(`${BASE_URL}/protected`, () =>
+          HttpResponse.json({ message: "Unauthorized" }, { status: 401 }),
+        ),
+      );
+
+      const client = createHttpClient({ baseUrl: BASE_URL });
+      const result = await client.post("/protected", {});
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("auth");
+        expect(result.error.status).toBe(401);
+      }
+    });
+  });
+
+  describe("post — 500 → http error", () => {
+    it("returns err with kind=http and status=500", async () => {
+      server.use(
+        http.post(`${BASE_URL}/crash`, () =>
+          HttpResponse.json({ message: "Server exploded" }, { status: 500 }),
+        ),
+      );
+
+      const client = createHttpClient({ baseUrl: BASE_URL });
+      const result = await client.post("/crash", {});
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("http");
+        expect(result.error.status).toBe(500);
+      }
+    });
+  });
+
+  describe("post — network failure → network error", () => {
+    it("returns err with kind=network when fetch rejects", async () => {
+      server.use(http.post(`${BASE_URL}/offline`, () => HttpResponse.error()));
+
+      const client = createHttpClient({ baseUrl: BASE_URL });
+      const result = await client.post("/offline", { data: "x" });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("network");
+      }
+    });
+  });
+
+  describe("post — parse error — invalid JSON in 2xx body", () => {
+    it("returns err with kind=parse when body is not valid JSON", async () => {
+      server.use(
+        http.post(
+          `${BASE_URL}/bad-json`,
+          () =>
+            new HttpResponse("not-json{{{", {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+        ),
+      );
+
+      const client = createHttpClient({ baseUrl: BASE_URL });
+      const result = await client.post("/bad-json", {});
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("parse");
       }
     });
   });

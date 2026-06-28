@@ -2,25 +2,24 @@
  * Domain-agnostic HTTP client factory.
  *
  * createHttpClient({ baseUrl, defaultHeaders? }) returns a client with:
- *   get<T>(path, opts?) => Promise<Result<T | NotModified>>
+ *   get<T>(path, opts?)   => Promise<Result<T>>
+ *   post<T>(path, body, opts?) => Promise<Result<T>>
  *
  * Never throws — all error paths return Result.
  *
- * 304 design choice: a 304 response is treated as a successful, explicit
- * "not modified" signal rather than an error. The client returns
- * ok({ notModified: true }) so callers can branch without checking error kinds.
- * This keeps the type as Result<T | NotModifiedResult> and avoids forcing
- * callers into an error-handling path for a normal cache-hit scenario.
+ * Error mapping:
+ *   2xx  → ok(parsedJson)
+ *   401  → err({ kind: "auth",    status: 401 })
+ *   !ok  → err({ kind: "http",    status })
+ *   fetch rejects → err({ kind: "network" })
+ *   json() throws → err({ kind: "parse" })
  */
 
 import type { ApiError, Result } from "../result";
 import { err, ok } from "../result";
 
-export type NotModifiedResult = { notModified: true };
-
-export type GetOptions = {
+export type RequestOptions = {
   headers?: Record<string, string>;
-  etag?: string;
   signal?: AbortSignal;
 };
 
@@ -30,59 +29,73 @@ export type HttpClientConfig = {
 };
 
 export type HttpClient = {
-  get<T>(path: string, opts?: GetOptions): Promise<Result<T | NotModifiedResult>>;
+  get<T>(path: string, opts?: RequestOptions): Promise<Result<T>>;
+  post<T>(path: string, body: unknown, opts?: RequestOptions): Promise<Result<T>>;
 };
 
 export function createHttpClient(config: HttpClientConfig): HttpClient {
   const { baseUrl, defaultHeaders = {} } = config;
 
+  async function request<T>(
+    method: string,
+    path: string,
+    opts: RequestOptions & { body?: unknown },
+  ): Promise<Result<T>> {
+    const headers: Record<string, string> = {
+      ...defaultHeaders,
+      ...opts.headers,
+    };
+
+    const fetchInit: {
+      method: string;
+      headers: Record<string, string>;
+      signal?: AbortSignal;
+      body?: string;
+    } = { method, headers, signal: opts.signal };
+
+    if (opts.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      fetchInit.body = JSON.stringify(opts.body);
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}${path}`, fetchInit);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Network request failed";
+      return err<ApiError>({ kind: "network", message });
+    }
+
+    if (response.status === 401) {
+      return err<ApiError>({ kind: "auth", status: 401, message: "Unauthorized" });
+    }
+
+    if (!response.ok) {
+      return err<ApiError>({
+        kind: "http",
+        status: response.status,
+        message: response.statusText || `HTTP error ${response.status}`,
+      });
+    }
+
+    let data: T;
+    try {
+      data = (await response.json()) as T;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to parse response body";
+      return err<ApiError>({ kind: "parse", message });
+    }
+
+    return ok<T>(data);
+  }
+
   return {
-    async get<T>(path: string, opts: GetOptions = {}): Promise<Result<T | NotModifiedResult>> {
-      const headers: Record<string, string> = {
-        ...defaultHeaders,
-        ...opts.headers,
-      };
+    get<T>(path: string, opts: RequestOptions = {}): Promise<Result<T>> {
+      return request<T>("GET", path, opts);
+    },
 
-      if (opts.etag !== undefined) {
-        headers["If-None-Match"] = opts.etag;
-      }
-
-      let response: Response;
-      try {
-        response = await fetch(`${baseUrl}${path}`, {
-          headers,
-          signal: opts.signal,
-        });
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "Network request failed";
-        return err<ApiError>({ kind: "network", message });
-      }
-
-      if (response.status === 304) {
-        return ok<NotModifiedResult>({ notModified: true });
-      }
-
-      if (response.status === 401) {
-        return err<ApiError>({ kind: "auth", status: 401, message: "Unauthorized" });
-      }
-
-      if (!response.ok) {
-        return err<ApiError>({
-          kind: "http",
-          status: response.status,
-          message: response.statusText || `HTTP error ${response.status}`,
-        });
-      }
-
-      let data: T;
-      try {
-        data = (await response.json()) as T;
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "Failed to parse response body";
-        return err<ApiError>({ kind: "parse", message });
-      }
-
-      return ok<T>(data);
+    post<T>(path: string, body: unknown, opts: RequestOptions = {}): Promise<Result<T>> {
+      return request<T>("POST", path, { ...opts, body });
     },
   };
 }

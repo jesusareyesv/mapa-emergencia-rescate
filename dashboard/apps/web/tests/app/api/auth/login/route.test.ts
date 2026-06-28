@@ -37,6 +37,20 @@ describe("POST /api/auth/login", () => {
       expect(body).toEqual({ ok: true });
     });
 
+    it("forwards { password } body to the upstream API", async () => {
+      let capturedBody: unknown;
+      server.use(
+        http.post(`${TEST_API_URL}/api/admin/login`, async ({ request }) => {
+          capturedBody = await request.json();
+          return HttpResponse.json({ token: "some-token" }, { status: 200 });
+        }),
+      );
+
+      await POST(makeLoginRequest({ password: "my-secret-pw" }));
+
+      expect(capturedBody).toEqual({ password: "my-secret-pw" });
+    });
+
     it("sets Cache-Control: no-store", async () => {
       server.use(
         http.post(`${TEST_API_URL}/api/admin/login`, () =>
