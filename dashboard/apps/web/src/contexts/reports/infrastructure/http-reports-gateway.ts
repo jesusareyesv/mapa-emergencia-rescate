@@ -19,10 +19,10 @@ type AdminDataResponse = {
 };
 
 export function createHttpReportsGateway(): ReportsGateway {
+  const client = createHttpClient({ baseUrl: getApiBaseUrl("emergency") });
+
   return {
     async list(token: string): Promise<Result<Report[]>> {
-      const client = createHttpClient({ baseUrl: getApiBaseUrl("emergency") });
-
       const result = await client.get<AdminDataResponse>("/api/admin/data", {
         headers: { "x-admin-token": token },
       });
@@ -33,8 +33,8 @@ export function createHttpReportsGateway(): ReportsGateway {
 
       const payload = result.value;
 
-      // Guard: 304 NotModified is not expected here but handle gracefully
-      if ("notModified" in payload && (payload as { notModified?: boolean }).notModified === true) {
+      // Guard: HttpClient models a 304 as a NotModified result; not expected here.
+      if ("notModified" in payload) {
         return err({ kind: "parse", message: "Unexpected 304 response from admin data endpoint" });
       }
 
