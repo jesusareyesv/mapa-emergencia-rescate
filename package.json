@@ -62,7 +62,8 @@
     "vitest": "^4.1.9"
   },
   "lint-staged": {
-    "*.{ts,tsx,mjs,js}": "eslint --fix"
+    "{app,lib,scripts,worker,infra}/**/*.{ts,tsx,mjs,js}": "eslint --fix",
+    "./*.{ts,tsx,mjs,js}": "eslint --fix"
   },
   "overrides": {
     "postcss": "^8.5.10"
