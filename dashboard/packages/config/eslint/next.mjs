@@ -14,7 +14,8 @@
 
 import js from "@eslint/js";
 import nextConfig from "eslint-config-next";
-import vitest from "eslint-plugin-vitest";
+
+import sharedConfigs from "./shared.mjs";
 
 /** @type {import("eslint").Linter.Config[]} */
 const config = [
@@ -25,59 +26,10 @@ const config = [
   //    jsx-a11y, and @next/eslint-plugin-next)
   ...nextConfig,
 
-  // 3. Import-boundary rules (GC10 — DDD layer enforcement).
-  //    Identical to base.mjs — scoped by `files` glob.
-
-  // 3a. domain + application layers: must not import from infrastructure or ui.
-  {
-    name: "repo/boundaries/domain-application",
-    files: ["**/domain/**", "**/application/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["**/infrastructure/**", "**/ui/**"],
-              message:
-                "domain/application must not depend on infrastructure or ui (DDD layering)",
-            },
-          ],
-        },
-      ],
-    },
-  },
-
-  // 3b. ui layer: must not import from contexts (keep components domain-agnostic).
-  {
-    name: "repo/boundaries/ui",
-    files: ["**/ui/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["**/contexts/**"],
-              message:
-                "ui must stay domain-agnostic (no imports from contexts)",
-            },
-          ],
-        },
-      ],
-    },
-  },
-
-  // 4. Vitest plugin rules + globals, scoped to test/spec files only.
-  //    Merges vitest.configs.recommended (rules + plugin registration) and
-  //    vitest.configs.env (languageOptions.globals for describe/it/expect/vi/…).
-  {
-    name: "repo/vitest",
-    files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    plugins: vitest.configs.recommended.plugins,
-    rules: vitest.configs.recommended.rules,
-    languageOptions: vitest.configs.env.languageOptions,
-  },
+  // 3 & 4. Boundary rules (GC10) + vitest block — sourced from shared.mjs.
+  //   shared.mjs does NOT register jsx-a11y or typescript-eslint plugins,
+  //   so there is no "Cannot redefine plugin" conflict with eslint-config-next.
+  ...sharedConfigs,
 ];
 
 export default config;

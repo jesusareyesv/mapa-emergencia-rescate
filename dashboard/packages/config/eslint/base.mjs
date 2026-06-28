@@ -13,9 +13,10 @@
  */
 
 import js from "@eslint/js";
-import jsdocA11y from "eslint-plugin-jsx-a11y";
-import vitest from "eslint-plugin-vitest";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import tseslint from "typescript-eslint";
+
+import sharedConfigs from "./shared.mjs";
 
 /** @type {import("eslint").Linter.Config[]} */
 const config = [
@@ -26,61 +27,10 @@ const config = [
   ...tseslint.configs.recommended,
 
   // 3. jsx-a11y recommended (flat config object)
-  jsdocA11y.flatConfigs.recommended,
+  jsxA11y.flatConfigs.recommended,
 
-  // 4. Import-boundary rules (GC10 — DDD layer enforcement).
-  //    Scoped by `files` glob so restrictions apply only to the relevant layer.
-
-  // 4a. domain + application layers: must not import from infrastructure or ui.
-  {
-    name: "repo/boundaries/domain-application",
-    files: ["**/domain/**", "**/application/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["**/infrastructure/**", "**/ui/**"],
-              message:
-                "domain/application must not depend on infrastructure or ui (DDD layering)",
-            },
-          ],
-        },
-      ],
-    },
-  },
-
-  // 4b. ui layer: must not import from contexts (keep components domain-agnostic).
-  {
-    name: "repo/boundaries/ui",
-    files: ["**/ui/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["**/contexts/**"],
-              message:
-                "ui must stay domain-agnostic (no imports from contexts)",
-            },
-          ],
-        },
-      ],
-    },
-  },
-
-  // 5. Vitest plugin rules + globals, scoped to test/spec files only.
-  //    Merges vitest.configs.recommended (rules + plugin registration) and
-  //    vitest.configs.env (languageOptions.globals for describe/it/expect/vi/…).
-  {
-    name: "repo/vitest",
-    files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    plugins: vitest.configs.recommended.plugins,
-    rules: vitest.configs.recommended.rules,
-    languageOptions: vitest.configs.env.languageOptions,
-  },
+  // 4 & 5. Boundary rules (GC10) + vitest block — sourced from shared.mjs
+  ...sharedConfigs,
 ];
 
 export default config;
