@@ -5,3 +5,4 @@ coverage
 package-lock.json
 *.log
 infra/k8s
+**/next-env.d.ts
