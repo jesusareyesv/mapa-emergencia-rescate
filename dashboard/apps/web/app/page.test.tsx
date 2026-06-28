@@ -6,4 +6,9 @@ describe("Home page", () => {
     render(<Page />);
     expect(screen.getByRole("heading", { name: "Panel de administración" })).toBeInTheDocument();
   });
+
+  it("renders the design-system button", () => {
+    render(<Page />);
+    expect(screen.getByRole("button", { name: "Actualizar" })).toBeInTheDocument();
+  });
 });
