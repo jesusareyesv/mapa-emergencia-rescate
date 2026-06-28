@@ -74,6 +74,8 @@ acción.
 
 - [0001 — Sincronización automática de fuentes de desaparecidos](rfcs/0001-sincronizacion-fuentes.md)
   · _propuesta_ · relacionado con la issue #1 (sync PFIF).
+- [0003 — Microservicio del dashboard de administración (multi-API)](rfcs/0003-microservicio-dashboard-admin.md)
+  · _propuesta_ · extrae el panel `/admin` a un frontal Next.js + BFF.
 
 ### ADRs
 
