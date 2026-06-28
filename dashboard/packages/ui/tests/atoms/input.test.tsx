@@ -36,4 +36,21 @@ describe("Input", () => {
     const input = document.querySelector("input");
     expect(input).toHaveAttribute("type", "email");
   });
+
+  it("generates unique ids for two inputs that share the same label", () => {
+    const { unmount } = render(
+      <div>
+        <Input label="Contraseña" value="" onChange={vi.fn()} />
+        <Input label="Contraseña" value="" onChange={vi.fn()} />
+      </div>,
+    );
+    const inputs = Array.from(document.querySelectorAll("input"));
+    expect(inputs).toHaveLength(2);
+    const id1 = inputs[0]?.getAttribute("id");
+    const id2 = inputs[1]?.getAttribute("id");
+    expect(id1).toBeTruthy();
+    expect(id2).toBeTruthy();
+    expect(id1).not.toBe(id2);
+    unmount();
+  });
 });

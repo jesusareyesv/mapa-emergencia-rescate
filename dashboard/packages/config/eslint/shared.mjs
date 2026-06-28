@@ -84,9 +84,23 @@ export const tsNoUnusedVarsOverride = {
 // Enforce kebab-case filenames for all TypeScript source and test files.
 // Scoped to .ts/.tsx only — config files (.mjs, .js, vitest.config.ts are
 // already kebab-case or handled by their own conventions).
+// Next.js special files (page, layout, route, etc.) are ignored so that
+// future multi-word Next files (e.g. not-found.tsx) don't trip the rule.
 export const filenameCaseConfig = {
   name: "repo/filename-case",
   files: ["**/*.{ts,tsx}"],
+  ignores: [
+    "**/page.tsx",
+    "**/layout.tsx",
+    "**/route.ts",
+    "**/route.tsx",
+    "**/middleware.ts",
+    "**/loading.tsx",
+    "**/error.tsx",
+    "**/not-found.tsx",
+    "**/template.tsx",
+    "**/default.tsx",
+  ],
   plugins: { unicorn },
   rules: {
     "unicorn/filename-case": ["error", { case: "kebabCase" }],

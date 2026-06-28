@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from "react";
+import { useId, type InputHTMLAttributes } from "react";
 import { inputBase, inputLabel } from "../tokens";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -20,9 +20,8 @@ export function Input({
   className = "",
   ...rest
 }: InputProps) {
-  const inputId =
-    id ??
-    (label ? `input-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
+  const generatedId = useId();
+  const inputId = id ?? (label ? generatedId : undefined);
 
   return (
     <div>

@@ -1,63 +1,37 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
-import { useAdminSession } from "./use-admin-session";
-import { AdminSessionContext } from "./admin-session-context";
+import { useState, type ReactNode } from "react";
+import { useAdminSessionContext } from "./admin-session-context";
+import { LoginForm } from "./login-form";
 
 interface AdminGateProps {
   children: ReactNode;
 }
 
+/**
+ * Pure conditional: shows LoginForm when unauthenticated, children when authenticated.
+ * Session state lives in AdminSessionProvider (ancestor); this component only reads it.
+ */
 export function AdminGate({ children }: AdminGateProps) {
-  const { token, login, logout } = useAdminSession();
-  const [password, setPassword] = useState("");
+  const { token, login } = useAdminSessionContext();
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState(false);
 
   if (token) {
-    return (
-      <AdminSessionContext.Provider value={{ token, logout }}>
-        {children}
-      </AdminSessionContext.Provider>
-    );
+    return <>{children}</>;
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleLogin(password: string) {
     setError(null);
-    setLoading(true);
+    setPending(true);
     try {
       await login(password);
     } catch {
       setError("Credenciales inválidas. Inténtalo de nuevo.");
     } finally {
-      setLoading(false);
+      setPending(false);
     }
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-4 w-full max-w-xs">
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Contraseña"
-        required
-        className="rounded border border-gray-300 px-3 py-2 text-sm"
-        aria-label="Contraseña"
-      />
-      {error && (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        {loading ? "Entrando..." : "Entrar"}
-      </button>
-    </form>
-  );
+  return <LoginForm onSubmit={handleLogin} error={error} pending={pending} />;
 }

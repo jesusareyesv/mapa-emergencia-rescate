@@ -1,17 +1,20 @@
 "use client";
 
+import { AdminSessionProvider } from "../src/shared/auth/admin-session-provider";
 import { AdminGate } from "../src/shared/auth/admin-gate";
 import { AdminPanelInner } from "./admin-panel-inner";
 
 /**
- * Composes the auth gate with the metrics screen.
- * Session state is owned by AdminGate; AdminPanelInner
- * consumes it via context so a 401 logout collapses back to login.
+ * Composes AdminSessionProvider (owns session state + context) with the auth
+ * gate and the metrics screen. A 401 from the BFF triggers logout via context,
+ * collapsing AdminGate back to LoginForm.
  */
 export function AdminPanel() {
   return (
-    <AdminGate>
-      <AdminPanelInner />
-    </AdminGate>
+    <AdminSessionProvider>
+      <AdminGate>
+        <AdminPanelInner />
+      </AdminGate>
+    </AdminSessionProvider>
   );
 }
