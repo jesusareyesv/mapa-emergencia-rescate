@@ -8,9 +8,11 @@
  * Exports:
  *  - boundaryConfigs — two no-restricted-imports objects (GC10 DDD layering)
  *  - vitestConfig    — eslint-plugin-vitest block scoped to test/spec files
- *  - sharedConfigs   — array of all three (spread into base/next config arrays)
+ *  - filenameCase    — unicorn/filename-case (kebabCase) for .ts/.tsx files
+ *  - sharedConfigs   — array of all (spread into base/next config arrays)
  */
 
+import unicorn from "eslint-plugin-unicorn";
 import vitest from "eslint-plugin-vitest";
 
 // 4a / 3a. domain + application layers: must not import from infrastructure or ui.
@@ -79,12 +81,25 @@ export const tsNoUnusedVarsOverride = {
   },
 };
 
+// Enforce kebab-case filenames for all TypeScript source and test files.
+// Scoped to .ts/.tsx only — config files (.mjs, .js, vitest.config.ts are
+// already kebab-case or handled by their own conventions).
+export const filenameCaseConfig = {
+  name: "repo/filename-case",
+  files: ["**/*.{ts,tsx}"],
+  plugins: { unicorn },
+  rules: {
+    "unicorn/filename-case": ["error", { case: "kebabCase" }],
+  },
+};
+
 /** All shared configs as a flat array — spread into the consumer's config. */
 const sharedConfigs = [
   domainApplicationBoundary,
   uiBoundary,
   vitestConfig,
   tsNoUnusedVarsOverride,
+  filenameCaseConfig,
 ];
 
 export default sharedConfigs;
