@@ -1,14 +1,22 @@
 "use client";
 
+import { useEffect } from "react";
 import { MetricCard } from "@repo/ui";
-import { useReports } from "./use-reports";
+import { useReports, UnauthorizedError } from "./use-reports";
 
 interface ReportsMetricsProps {
   token: string;
+  onUnauthorized: () => void;
 }
 
-export function ReportsMetrics({ token }: ReportsMetricsProps) {
-  const { data: reports, isLoading, isError } = useReports(token);
+export function ReportsMetrics({ token, onUnauthorized }: ReportsMetricsProps) {
+  const { data: reports, isLoading, isError, error } = useReports(token);
+
+  useEffect(() => {
+    if (isError && error instanceof UnauthorizedError) {
+      onUnauthorized();
+    }
+  }, [isError, error, onUnauthorized]);
 
   if (isLoading) {
     return <p>Cargando métricas...</p>;

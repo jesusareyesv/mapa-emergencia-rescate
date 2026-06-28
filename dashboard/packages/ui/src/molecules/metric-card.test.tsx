@@ -27,4 +27,16 @@ describe("MetricCard", () => {
     render(<MetricCard label="Total reportes" value={42} />);
     expect(screen.queryByText("últimas 24h")).not.toBeInTheDocument();
   });
+
+  it("applies accent colour to the value element", () => {
+    render(<MetricCard label="Total reportes" value={42} accent="#ef4444" />);
+    const valueEl = screen.getByText("42");
+    expect(valueEl).toHaveStyle({ color: "#ef4444" });
+  });
+
+  it("does not apply inline color style when accent is absent", () => {
+    render(<MetricCard label="Total reportes" value={42} />);
+    const valueEl = screen.getByText("42");
+    expect(valueEl).not.toHaveAttribute("style");
+  });
 });

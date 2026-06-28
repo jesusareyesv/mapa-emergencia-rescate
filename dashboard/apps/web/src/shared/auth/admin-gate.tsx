@@ -2,19 +2,24 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useAdminSession } from "./use-admin-session";
+import { AdminSessionContext } from "./admin-session-context";
 
 interface AdminGateProps {
   children: ReactNode;
 }
 
 export function AdminGate({ children }: AdminGateProps) {
-  const { token, login } = useAdminSession();
+  const { token, login, logout } = useAdminSession();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   if (token) {
-    return <>{children}</>;
+    return (
+      <AdminSessionContext.Provider value={{ token, logout }}>
+        {children}
+      </AdminSessionContext.Provider>
+    );
   }
 
   async function handleSubmit(e: FormEvent) {

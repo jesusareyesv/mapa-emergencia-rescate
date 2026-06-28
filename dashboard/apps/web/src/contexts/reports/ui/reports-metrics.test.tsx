@@ -1,9 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { server } from "@repo/config/vitest/setup";
 import { ReportsMetrics } from "./reports-metrics";
+import { AdminPanel } from "../../../../app/admin-panel";
 import { renderWithProviders } from "../../../shared/test-utils/render-with-providers";
+
+const TOKEN_KEY = "dashboard:adminToken";
 
 const SAMPLE_REPORTS = [
   {
@@ -45,12 +48,36 @@ const SAMPLE_REPORTS = [
 ];
 
 describe("ReportsMetrics", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  describe("401 → logout (composition test)", () => {
+    it("returns to the login form when /api/reports responds 401 while authenticated", async () => {
+      // Pre-seed the token so AdminGate shows children (the metrics screen)
+      sessionStorage.setItem(TOKEN_KEY, "valid-token");
+
+      server.use(
+        http.get("/api/reports", () =>
+          HttpResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        ),
+      );
+
+      renderWithProviders(<AdminPanel />);
+
+      // The login form (password input) should reappear after the 401 triggers logout
+      await waitFor(() => {
+        expect(screen.getByLabelText("Contraseña")).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("loading state", () => {
     it("shows a loading indicator initially", () => {
       server.use(
         http.get("/api/reports", () => new Promise(() => {})), // never resolves
       );
-      renderWithProviders(<ReportsMetrics token="test-token" />);
+      renderWithProviders(<ReportsMetrics token="test-token" onUnauthorized={() => {}} />);
       expect(screen.getByText(/cargando|loading/i)).toBeInTheDocument();
     });
   });
@@ -58,7 +85,7 @@ describe("ReportsMetrics", () => {
   describe("success state", () => {
     it("shows total report count", async () => {
       server.use(http.get("/api/reports", () => HttpResponse.json(SAMPLE_REPORTS)));
-      renderWithProviders(<ReportsMetrics token="test-token" />);
+      renderWithProviders(<ReportsMetrics token="test-token" onUnauthorized={() => {}} />);
 
       await waitFor(() => {
         expect(screen.getByText("3")).toBeInTheDocument();
@@ -67,7 +94,7 @@ describe("ReportsMetrics", () => {
 
     it("shows total affected count", async () => {
       server.use(http.get("/api/reports", () => HttpResponse.json(SAMPLE_REPORTS)));
-      renderWithProviders(<ReportsMetrics token="test-token" />);
+      renderWithProviders(<ReportsMetrics token="test-token" onUnauthorized={() => {}} />);
 
       await waitFor(() => {
         expect(screen.getByText("18")).toBeInTheDocument(); // 10+5+3
@@ -82,7 +109,7 @@ describe("ReportsMetrics", () => {
           return HttpResponse.json([]);
         }),
       );
-      renderWithProviders(<ReportsMetrics token="my-secret-token" />);
+      renderWithProviders(<ReportsMetrics token="my-secret-token" onUnauthorized={() => {}} />);
 
       await waitFor(() => {
         expect(capturedToken).toBe("my-secret-token");
@@ -97,7 +124,7 @@ describe("ReportsMetrics", () => {
           HttpResponse.json({ error: "Internal Server Error" }, { status: 500 }),
         ),
       );
-      renderWithProviders(<ReportsMetrics token="test-token" />);
+      renderWithProviders(<ReportsMetrics token="test-token" onUnauthorized={() => {}} />);
 
       await waitFor(() => {
         expect(screen.getByText(/error/i)).toBeInTheDocument();

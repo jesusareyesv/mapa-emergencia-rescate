@@ -1,14 +1,17 @@
 "use client";
 
-import { useAdminSession } from "../src/shared/auth/use-admin-session";
 import { AdminGate } from "../src/shared/auth/admin-gate";
-import { ReportsMetrics } from "../src/contexts/reports/ui/reports-metrics";
+import { AdminPanelInner } from "./admin-panel-inner";
 
 /**
- * Thin client wrapper that reads the token from the session
- * and passes it to ReportsMetrics inside the auth gate.
+ * Composes the auth gate with the metrics screen.
+ * Session state is owned by AdminGate; AdminPanelInner
+ * consumes it via context so a 401 logout collapses back to login.
  */
 export function AdminPanel() {
-  const { token } = useAdminSession();
-  return <AdminGate>{token !== null && <ReportsMetrics token={token} />}</AdminGate>;
+  return (
+    <AdminGate>
+      <AdminPanelInner />
+    </AdminGate>
+  );
 }
