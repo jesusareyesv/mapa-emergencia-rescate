@@ -1,0 +1,31 @@
+# ConfigMap example for the dashboard microfrontend.
+#
+# Copy this file, fill in the values for your environment, and apply it
+# BEFORE the first deploy:
+#
+#   kubectl -n mapa apply -f dashboard-config.example.yaml
+#
+# The deploy workflow (deploy-dashboard.yml) creates / refreshes this ConfigMap
+# from GitHub vars/secrets so the correct value is always in the cluster.
+#
+# Why ConfigMap (not Secret)?
+#   EMERGENCY_API_URL and SUPPLIES_API_URL are cluster-internal base URLs —
+#   not credentials. No password or token is stored here.
+#
+# In-cluster service URL (server-to-server, no CORS, no public network hop):
+#   http://app.mapa.svc.cluster.local
+#   This resolves to the `app` Service in the `mapa` namespace via kube-dns.
+#   The dashboard BFF calls this URL from the pod, not from the browser.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-config
+  namespace: mapa
+data:
+  # Base URL of the emergencies API (the main app, same cluster).
+  # Suggested value (in-cluster): http://app.mapa.svc.cluster.local
+  # Override with the public URL if running outside the cluster.
+  EMERGENCY_API_URL: "http://app.mapa.svc.cluster.local"
+
+  # Base URL of the supplies API (optional — omit if not used yet).
+  # SUPPLIES_API_URL: "http://supplies.mapa.svc.cluster.local"

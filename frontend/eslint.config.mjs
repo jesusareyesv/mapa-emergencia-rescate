@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     // Scripts de build/utilidades (Node .mjs, usan require/CommonJS); no se
     // lintean con las reglas TS de la app.
     "scripts/**",
+    // Microservicio frontal (monorepo anidado en dashboard/): tiene su propio
+    // toolchain y CI. El ESLint raíz no debe meterse en él.
+    "dashboard/**",
   ]),
   {
     rules: {

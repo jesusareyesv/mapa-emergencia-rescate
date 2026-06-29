@@ -1,0 +1,246 @@
+# Deploy Dashboard microfrontend to Hetzner (k3s) — DEPLOY ONLY.
+#
+# Trigger:
+#   - PR MERGEADO a `main` con cambios en dashboard/ o este workflow
+#                              -> auto-deploy a STAGING (CD). Un push crudo / bypass
+#                              de admin a main NO dispara deploy.
+#   - workflow_dispatch     -> deploy manual; eliges target (staging | prod).
+#                              (prod SIEMPRE es un botón deliberado, nunca auto.)
+#
+# Hace: gate de verificación (lint + typecheck + test) -> build imagen dashboard ->
+# push a GHCR -> ensura ConfigMap dashboard-config -> aplica manifests ->
+# roll zero-downtime.
+#
+# Sin worker, sin migrate-job, sin subida de estáticos a R2 — el microfrontend
+# no tiene base de datos ni assets CDN.
+#
+# RESTRICCIÓN: el gate real es el `if` a nivel de job
+# (github.event.pull_request.merged == true && base.ref == 'main', o dispatch).
+# El ruleset "proteger main" exige PR + review de code-owner + check Build & Test.
+#
+# Pre-requisitos (una vez, fuera de este workflow): cluster k3s con namespace mapa,
+# secret KUBECONFIG (base64).
+#
+# Zero-downtime: lo imponen los manifests (maxUnavailable:0 + readinessProbe
+# /api/health) y lo confirma `kubectl rollout status`.
+name: Deploy Dashboard to Hetzner (k3s)
+
+on:
+  # Solo despliega cuando un PR se MERGEA a main y toca el microfrontend
+  # (no en push crudo / bypass de admin). El gate real es el `if` del job.
+  pull_request:
+    types: [closed]
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - ".github/workflows/deploy-dashboard.yml"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Environment (LB TLS profile)"
+        type: choice
+        default: staging
+        options:
+          - staging   # TLS at Cloudflare (proxied); LB serves the CF origin cert
+          - prod      # TLS at the LB (Hetzner managed cert) on :443
+
+permissions:
+  contents: read
+  packages: write       # push images to GHCR
+  deployments: write
+
+# IMAGE is computed at runtime (lowercased) — GHCR/Docker require all-lowercase
+# repository names and ${{ github.repository }} can contain uppercase.
+
+jobs:
+  # Gate: nada se despliega si el código no compila/lint/pasa tests.
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    # Corre solo si: (a) un PR se MERGEÓ a main, o (b) dispatch manual.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main')
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install deps
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm run test
+
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    needs: verify
+    # Mismo gate que verify: PR mergeado a main, o dispatch manual. Un push crudo
+    # a main (p.ej. bypass de admin) NO dispara este workflow.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # En pull_request:closed el checkout por defecto es la merge-ref del PR.
+          # El PR YA está mergeado, así que construimos sobre `main` real.
+          ref: main
+
+      - name: Compute image name (lowercase) + SHA
+        run: |
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-dashboard" >> "$GITHUB_ENV"
+          # github.sha en pull_request apunta a la merge-ref de prueba; usamos el
+          # HEAD real de main (lo que acabamos de hacer checkout) para taggear.
+          echo "SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      # Resuelve el target: merge a main -> staging; dispatch -> lo elegido
+      # (default staging). prod NUNCA sale de un merge automático.
+      - name: Resolve target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "TARGET=${{ inputs.target }}" >> "$GITHUB_ENV"
+          else
+            echo "TARGET=staging" >> "$GITHUB_ENV"
+          fi
+
+      - name: Show inputs
+        run: |
+          echo "event  = ${{ github.event_name }}"
+          echo "target = $TARGET"
+          echo "image  = ${{ env.IMAGE }}:${{ env.SHA }}"
+          echo "actor  = ${{ github.actor }}"
+          echo "ref    = ${{ github.ref }}"
+
+      # ---------------------------------------------------------------
+      # 1. Build the immutable dashboard image, push to GHCR (:<sha> + :latest)
+      # ---------------------------------------------------------------
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push (dashboard)
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/Dockerfile
+          target: runtime
+          push: true
+          # build-push-action@v6 adjunta attestations (provenance/SBOM) por
+          # defecto, que se PUSHEAN como manifests extra. Con GITHUB_TOKEN en una
+          # org eso dispara "installation not allowed to Write organization
+          # package" aunque la imagen principal sí se permita. Las desactivamos.
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.IMAGE }}:${{ env.SHA }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ---------------------------------------------------------------
+      # 2. Configure kubectl from the KUBECONFIG secret (set once at provision).
+      # ---------------------------------------------------------------
+      - name: Install kubectl
+        run: |
+          curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -m0755 kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
+      - name: Configure kubectl
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KUBECONFIG_B64" ]; then
+            echo "::error::KUBECONFIG secret not set — provision the cluster first."
+            exit 1
+          fi
+          mkdir -p "$HOME/.kube"
+          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          kubectl get nodes
+
+      # GHCR es privado -> el clúster necesita un secret de pull. Lo creamos/
+      # refrescamos en cada deploy con el GITHUB_TOKEN del run (tiene read:packages
+      # sobre este repo). Los manifests referencian `imagePullSecrets: ghcr-pull`.
+      - name: Ensure ghcr-pull secret
+        run: |
+          set -euo pipefail
+          kubectl create namespace mapa --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n mapa create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username='${{ github.actor }}' \
+            --docker-password='${{ secrets.GITHUB_TOKEN }}' \
+            --docker-email='ci@users.noreply.github.com' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # Crea o refresca el ConfigMap dashboard-config con la URL de la API de
+      # emergencias. Lee EMERGENCY_API_URL de una GH var; si no está seteada usa
+      # el default in-cluster (http://app.mapa.svc.cluster.local).
+      - name: Ensure dashboard-config ConfigMap
+        env:
+          EMERGENCY_API_URL: ${{ vars.EMERGENCY_API_URL }}
+        run: |
+          set -euo pipefail
+          kubectl -n mapa create configmap dashboard-config \
+            --from-literal=EMERGENCY_API_URL="${EMERGENCY_API_URL:-http://app.mapa.svc.cluster.local}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ---------------------------------------------------------------
+      # 3. Apply manifests (Service rendered per target), roll.
+      # ---------------------------------------------------------------
+      - name: Apply manifests
+        env:
+          DASHBOARD_HOST: ${{ secrets.DASHBOARD_HOST }}
+        run: |
+          set -euo pipefail
+          # ONE service.yaml serves both envs; envsubst fills the TLS profile.
+          HTTP_PORT=$(printf '    - name: http\n      protocol: TCP\n      port: 80\n      targetPort: 3000')
+          if [ "$TARGET" = "prod" ]; then
+            : "${DASHBOARD_HOST:?prod target needs the DASHBOARD_HOST secret (the public hostname)}"
+            export TLS_ANNOTATIONS=$(printf '    load-balancer.hetzner.cloud/protocol: "https"\n    load-balancer.hetzner.cloud/certificate-type: "managed"\n    load-balancer.hetzner.cloud/http-managed-certificate-domains: "%s"\n    load-balancer.hetzner.cloud/http-redirect-https: "true"' "$DASHBOARD_HOST")
+            export LB_PORTS=$(printf '    - name: https\n      protocol: TCP\n      port: 443\n      targetPort: 3000\n%s' "$HTTP_PORT")
+          else
+            export TLS_ANNOTATIONS=$(printf '    load-balancer.hetzner.cloud/protocol: "https"\n    load-balancer.hetzner.cloud/http-certificates: "cf-origin-dreamit"\n    load-balancer.hetzner.cloud/http-redirect-https: "true"')
+            export LB_PORTS=$(printf '    - name: https\n      protocol: TCP\n      port: 443\n      targetPort: 3000\n%s' "$HTTP_PORT")
+          fi
+          envsubst '${TLS_ANNOTATIONS} ${LB_PORTS}' < dashboard/infra/k8s/service.yaml > /tmp/dashboard-service.rendered.yaml
+          echo "--- rendered Service (target=$TARGET) ---"
+          cat /tmp/dashboard-service.rendered.yaml
+
+          kubectl apply -f /tmp/dashboard-service.rendered.yaml
+          kubectl apply -f dashboard/infra/k8s/deployment.yaml
+
+      - name: Roll to the new image (zero-downtime)
+        run: |
+          set -euo pipefail
+          kubectl -n mapa set image deployment/dashboard \
+            dashboard=${{ env.IMAGE }}:${{ env.SHA }}
+          kubectl -n mapa rollout status deployment/dashboard --timeout=300s
+
+      - name: Rollback hint on failure
+        if: ${{ failure() }}
+        run: |
+          echo "::warning::Deploy failed. To revert: kubectl -n mapa rollout undo deployment/dashboard"
+
+      - name: Done
+        run: echo "deploy ($TARGET) finished."
