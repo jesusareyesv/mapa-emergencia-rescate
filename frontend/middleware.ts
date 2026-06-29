@@ -22,7 +22,6 @@ function isApiHost(host: string | null): boolean {
   // host puede venir con puerto (api.localhost:3000) → basta el prefijo.
   return host.startsWith("api.");
 }
-
 const ALLOWED_NON_API = ["/_next/", "/favicon.ico", "/robots.txt"];
 
 export function middleware(request: NextRequest) {
