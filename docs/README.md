@@ -129,6 +129,7 @@ acción.
 
 ### Guías
 
+- [Integración con la API externa v1 (socios y consumidores)](guides/integracion-api-v1.md)
 - [Desplegar la sincronización con Vercel Cron](guides/sincronizacion-cron-vercel.md)
 - [Rendimiento, capacidad y pruebas de carga](guides/rendimiento-y-pruebas-de-carga.md)
 - [Documentar endpoints (OpenAPI / Swagger)](guides/documentar-endpoints-openapi.md)
