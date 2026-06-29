@@ -1,5 +1,5 @@
 {
-  "name": "@repo/web",
+  "name": "web",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -11,16 +11,17 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@repo/ui": "*",
     "@tanstack/react-query": "^5.0.0",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@repo/config": "*",
     "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "26.0.1",
+    "@types/react": "19.2.17",
     "@vitejs/plugin-react": "^4.5.2",
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.0.0",
+    "typescript": "6.0.3"
   }
 }
