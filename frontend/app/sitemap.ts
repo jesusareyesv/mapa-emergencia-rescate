@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
-import { serverApiGet } from "@/lib/server-api";
 import { buildHospitalSlug, type Hospital } from "@/lib/hospitals-meta";
+import { serverApiGet } from "@/lib/server-api";
 import { SITE_URL } from "@/lib/site";
 
 // Refresca el sitemap cada hora para reflejar altas/bajas de hospitales sin

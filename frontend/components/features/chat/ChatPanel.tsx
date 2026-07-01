@@ -1,22 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { useLowBandwidthMode } from "@/hooks/useLowBandwidthMode";
-import { trackEvent } from "@/lib/openpanel";
-import { useTurnstile } from "@/hooks/useTurnstile";
+import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useChatMessages,
   useDeleteChatMessage,
   useSendChatMessage,
 } from "@/hooks/chat";
+import { useLowBandwidthMode } from "@/hooks/useLowBandwidthMode";
+import { useTurnstile } from "@/hooks/useTurnstile";
 import {
-  CHAT_ROLES,
   CHAT_ROLE_KEYS,
-  getRoleMeta,
-  isValidChatRole,
+  CHAT_ROLES,
   type ChatMessage,
   type ChatRole,
+  getRoleMeta,
+  isValidChatRole,
 } from "@/lib/chat-types";
+import { trackEvent } from "@/lib/openpanel";
 
 interface ChatNode {
   message: ChatMessage;

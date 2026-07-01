@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src worker",
+    "check:biome": "npx @biomejs/biome@2.5.1 check --error-on-warnings src worker",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:api": "vitest run test/api",

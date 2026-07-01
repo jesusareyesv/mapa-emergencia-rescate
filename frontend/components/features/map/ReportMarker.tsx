@@ -1,11 +1,11 @@
+import type L from "leaflet";
 import { memo } from "react";
-import L from "leaflet";
 import { Marker, Popup } from "react-leaflet";
-import { REPORT_TYPES, type EmergencyReport } from "@/lib/types";
+import LinkText from "@/components/ui/LinkText";
 import { mediaUrl } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
-import { xShareHref, whatsappShareHref } from "@/lib/share";
-import LinkText from "@/components/ui/LinkText";
+import { whatsappShareHref, xShareHref } from "@/lib/share";
+import { type EmergencyReport, REPORT_TYPES } from "@/lib/types";
 import { markerIcon } from "./icons";
 
 /** Pin de reporte de emergencia con su popup. Memoizado: la lista re-renderiza

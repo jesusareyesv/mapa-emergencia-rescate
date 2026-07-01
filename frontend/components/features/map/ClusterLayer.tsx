@@ -1,9 +1,9 @@
+import type L from "leaflet";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import L from "leaflet";
 import { Marker, useMap, useMapEvents } from "react-leaflet";
 import Supercluster, {
-	type ClusterProperties,
 	type AnyProps,
+	type ClusterProperties,
 } from "supercluster";
 import type { MissingMapMarker } from "@/hooks/missing";
 import { clusterIcon } from "./icons";

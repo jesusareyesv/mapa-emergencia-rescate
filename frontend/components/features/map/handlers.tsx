@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import L from "leaflet";
+import { useEffect, useRef } from "react";
 import { useMap, useMapEvents } from "react-leaflet";
 import type { MapBounds } from "./types";
 

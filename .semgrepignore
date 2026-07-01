@@ -1,0 +1,9 @@
+.agents/
+.cursor/
+.claude/
+.scope.json
+**/*.md
+infra/k8s/
+infra/tofu/
+scripts/
+.github/
