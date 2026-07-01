@@ -156,6 +156,12 @@ export const hospitals = pgTable(
     level: text("level"),
     priorityZone: text("priority_zone").notNull().default("P3"),
     isPriority: boolean("is_priority").notNull().default(false),
+    // Coordenadas y teléfono institucional públicos del centro (nullable: se
+    // pueblan por operación admin; no se siembran). Habilitan geo/telephone en
+    // el JSON-LD schema.org/Hospital de la ficha.
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    phone: text("phone"),
     createdAt: epochMs("created_at").notNull(),
   },
   (t) => [

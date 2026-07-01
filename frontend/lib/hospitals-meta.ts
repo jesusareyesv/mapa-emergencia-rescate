@@ -21,6 +21,9 @@ export interface Hospital {
   level: HospitalLevel;
   priorityZone: HospitalPriorityZone;
   isPriority: boolean;
+  lat: number | null;
+  lng: number | null;
+  phone: string | null;
   activePatients: number;
   totalPatients: number;
   createdAt: number;

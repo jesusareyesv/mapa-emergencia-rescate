@@ -67,6 +67,8 @@ export default async function HospitalPage({ params }: PageProps) {
   const facility = FACILITY_TYPE_META[hospital.facilityType];
 
   const hospitalUrl = `${SITE_URL}/hospitales/${canonicalSlug}`;
+  const hasGeo = hospital.lat !== null && hospital.lng !== null;
+  const phone = hospital.phone?.trim() || null;
   const hospitalJsonLd = {
     "@type": "Hospital",
     "@id": hospitalUrl,
@@ -79,6 +81,17 @@ export default async function HospitalPage({ params }: PageProps) {
       addressRegion: hospital.state,
       addressCountry: "VE",
     },
+    // Solo emitimos geo/telephone cuando el dato existe: no inventar datos.
+    ...(hasGeo
+      ? {
+          geo: {
+            "@type": "GeoCoordinates",
+            latitude: hospital.lat,
+            longitude: hospital.lng,
+          },
+        }
+      : {}),
+    ...(phone ? { telephone: phone } : {}),
     areaServed: { "@type": "Country", name: "Venezuela" },
     provider: { "@id": ORG_ID },
   };
@@ -145,6 +158,17 @@ export default async function HospitalPage({ params }: PageProps) {
           {hospital.address && (
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
               📍 {hospital.address}
+            </p>
+          )}
+          {phone && (
+            <p className="mt-2 text-sm text-slate-600">
+              📞{" "}
+              <a
+                href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+                className="font-medium text-blue-700 hover:underline"
+              >
+                {phone}
+              </a>
             </p>
           )}
 

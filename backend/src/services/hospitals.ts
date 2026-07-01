@@ -58,6 +58,7 @@ export type HospitalSupplyNeedStatus =
 export type HospitalSupplyHelpStatus = "open" | "contacting" | "resolved" | "closed";
 
 export const MAX_HOSPITAL_NAME = 200;
+export const MAX_HOSPITAL_PHONE = 40;
 export const MAX_PATIENT_NAME = 120;
 export const MAX_SUPPLY_NOTE = 600;
 export const MAX_SUPPLY_ITEM = 120;
@@ -283,6 +284,9 @@ export interface Hospital {
   level: HospitalLevel;
   priorityZone: HospitalPriorityZone;
   isPriority: boolean;
+  lat: number | null;
+  lng: number | null;
+  phone: string | null;
   activePatients: number;
   totalPatients: number;
   createdAt: number;
@@ -341,6 +345,28 @@ function normalizeLevel(v: string | null | undefined): HospitalLevel {
   if (t === "I" || t === "II" || t === "III" || t === "IV") return t;
   if (t === "MILITAR") return "militar";
   return null;
+}
+
+/** Latitud válida en [-90, 90]; cualquier otro valor (o vacío) → null. */
+function normalizeLat(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < -90 || n > 90) return null;
+  return n;
+}
+
+/** Longitud válida en [-180, 180]; cualquier otro valor (o vacío) → null. */
+function normalizeLng(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < -180 || n > 180) return null;
+  return n;
+}
+
+/** Teléfono institucional público, recortado; vacío → null. */
+function normalizePhone(v: string | null | undefined): string | null {
+  const t = (v ?? "").trim().slice(0, MAX_HOSPITAL_PHONE);
+  return t || null;
 }
 
 function normalizeAge(v: number | string | null | undefined): number | null {
@@ -442,6 +468,9 @@ function rowToHospital(row: HospitalRow): Hospital {
     level: normalizeLevel(row.level),
     priorityZone: normalizePriority(row.priorityZone),
     isPriority: Boolean(row.isPriority),
+    lat: normalizeLat(row.lat),
+    lng: normalizeLng(row.lng),
+    phone: normalizePhone(row.phone),
     activePatients: Number(row.activePatients ?? 0),
     totalPatients: Number(row.totalPatients ?? 0),
     createdAt: Number(row.createdAt),
@@ -491,7 +520,8 @@ export async function listHospitals(
       h.id, h.external_id AS "externalId", h.name,
       h.facility_type AS "facilityType", h.state, h.municipality,
       h.address, h.level, h.priority_zone AS "priorityZone",
-      h.is_priority AS "isPriority", h.created_at AS "createdAt",
+      h.is_priority AS "isPriority", h.lat, h.lng, h.phone,
+      h.created_at AS "createdAt",
       COALESCE(SUM(CASE WHEN p.status = 'hospitalized' THEN 1 ELSE 0 END), 0) AS "activePatients",
       COUNT(p.id) AS "totalPatients"
     FROM hospitals h
@@ -529,7 +559,8 @@ export async function getHospital(
       h.id, h.external_id AS "externalId", h.name,
       h.facility_type AS "facilityType", h.state, h.municipality,
       h.address, h.level, h.priority_zone AS "priorityZone",
-      h.is_priority AS "isPriority", h.created_at AS "createdAt",
+      h.is_priority AS "isPriority", h.lat, h.lng, h.phone,
+      h.created_at AS "createdAt",
       COALESCE(SUM(CASE WHEN p.status = 'hospitalized' THEN 1 ELSE 0 END), 0) AS "activePatients",
       COUNT(p.id) AS "totalPatients"
     FROM hospitals h
@@ -563,6 +594,9 @@ export interface NewHospital {
   address?: string;
   level?: HospitalLevel;
   priorityZone?: HospitalPriorityZone;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  phone?: string | null;
 }
 
 export async function addHospital(input: NewHospital): Promise<Hospital> {
@@ -581,6 +615,9 @@ export async function addHospital(input: NewHospital): Promise<Hospital> {
     level: input.level ?? null,
     priorityZone: input.priorityZone ?? "P3",
     isPriority: input.priorityZone === "P0" || input.priorityZone === "P1",
+    lat: normalizeLat(input.lat),
+    lng: normalizeLng(input.lng),
+    phone: normalizePhone(input.phone),
     activePatients: 0,
     totalPatients: 0,
     createdAt: Date.now(),
@@ -597,6 +634,9 @@ export async function addHospital(input: NewHospital): Promise<Hospital> {
     level: hospital.level,
     priorityZone: hospital.priorityZone,
     isPriority: hospital.isPriority,
+    lat: hospital.lat,
+    lng: hospital.lng,
+    phone: hospital.phone,
     createdAt: hospital.createdAt,
   });
   return hospital;
@@ -610,6 +650,9 @@ export interface UpdateHospitalInput {
   address?: string;
   level?: HospitalLevel;
   priorityZone?: HospitalPriorityZone;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  phone?: string | null;
 }
 
 /**
@@ -638,6 +681,9 @@ export async function updateHospital(
     patch.priorityZone = zone;
     patch.isPriority = zone === "P0" || zone === "P1";
   }
+  if (input.lat !== undefined) patch.lat = normalizeLat(input.lat);
+  if (input.lng !== undefined) patch.lng = normalizeLng(input.lng);
+  if (input.phone !== undefined) patch.phone = normalizePhone(input.phone);
   if (Object.keys(patch).length === 0) return getHospital(id);
   await db.update(hospitals).set(patch).where(eq(hospitals.id, id));
   return getHospital(id);

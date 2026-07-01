@@ -21,6 +21,12 @@ const priorityZone = z.enum(["P0", "P1", "P2", "P3"]);
 // `level` admite null explícito (sin nivel asignado), igual que el DTO.
 const level = z.enum(["I", "II", "III", "IV", "militar"]).nullable();
 
+// Coordenadas y teléfono institucional públicos (nullable: se pueden limpiar
+// enviando null). Mismo rango que reports.resource para lat/lng.
+const lat = z.coerce.number().min(-90).max(90).nullable();
+const lng = z.coerce.number().min(-180).max(180).nullable();
+const phone = z.string().trim().max(40).nullable();
+
 const createSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio.").max(200),
   facilityType: facilityType.optional(),
@@ -29,6 +35,9 @@ const createSchema = z.object({
   address: z.string().trim().max(400).optional(),
   level: level.optional(),
   priorityZone: priorityZone.optional(),
+  lat: lat.optional(),
+  lng: lng.optional(),
+  phone: phone.optional(),
 });
 
 const updateSchema = z
@@ -40,6 +49,9 @@ const updateSchema = z
     address: z.string().trim().max(400).optional(),
     level: level.optional(),
     priorityZone: priorityZone.optional(),
+    lat: lat.optional(),
+    lng: lng.optional(),
+    phone: phone.optional(),
   })
   .refine((o) => Object.keys(o).length > 0, "Envía al menos un campo a actualizar.");
 
@@ -56,6 +68,9 @@ const responseSchema = z.object({
   level: z.string().nullable(),
   priorityZone: z.enum(["P0", "P1", "P2", "P3"]),
   isPriority: z.boolean(),
+  lat: z.number().nullable(),
+  lng: z.number().nullable(),
+  phone: z.string().nullable(),
   activePatients: z.number(),
   totalPatients: z.number(),
   createdAt: z.number(),
@@ -81,6 +96,9 @@ export const hospitalsResource: CrudResource<
         address: input.address,
         level: input.level,
         priorityZone: input.priorityZone,
+        lat: input.lat,
+        lng: input.lng,
+        phone: input.phone,
       }),
     update: (id, input) => service.updateHospital(id, input),
     remove: (id) => service.removeHospital(id),
