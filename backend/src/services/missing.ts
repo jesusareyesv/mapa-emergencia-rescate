@@ -282,11 +282,15 @@ export async function listMissingPage(
   // Conteo y página independientes → en paralelo (la latencia es el MAX, no la
   // suma). Offset calculado con requestedPage directo; si excede el total,
   // devuelve vacío (evita el waterfall).
+
+  /*
+  29/6/26: No estaba trayendo "nationality". Se agregó en este commit
+  */
   const offset = (requestedPage - 1) * pageSize;
   const [countRes, listRes] = await Promise.all([
     db.execute(countQuery),
     db.execute(
-      sql`SELECT id, name, age, description, last_seen, contact,
+      sql`SELECT id, name, age, nationality, description, last_seen, contact,
                  (photo IS NOT NULL) AS has_photo,
                  photo_external_url,
                  status,

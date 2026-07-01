@@ -1,0 +1,85 @@
+# Modo desarrollo — hot reload sin rebuild de imágenes.
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#   # --build SOLO la primera vez o cuando cambia un package.json
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   # arranque rápido en corridas siguientes
+#
+# db, valkey y migrate-seed se heredan del compose base sin cambios.
+
+services:
+  db:
+    image: postgres:16-alpine
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.dev
+    working_dir: /app/backend
+    command: npm run dev # tsx watch src/server.ts
+    volumes:
+      - ./backend:/app/backend
+      - ./infra:/app/infra
+      - backend_nm:/app/node_modules # deps en raíz (volumen nombrado)
+      - /app/backend/node_modules # anon: enmascara node_modules del host
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    working_dir: /app
+    # --webpack: en Docker/Windows usamos webpack en vez de Turbopack (el default
+    # de `next dev` en Next 16). El watcher de Turbopack (crate `notify`) es poco
+    # fiable sobre binds del filesystem de Windows → recompilaciones/HMR espurios
+    # que causan reload loops y hot reload que no dispara. Webpack honra
+    # nativamente WATCHPACK_POLLING e ignora `.next`/`node_modules` correctamente.
+    # Fuera de Docker (`npm run dev` nativo) se sigue usando Turbopack.
+    command: npx next dev --webpack -H 0.0.0.0 -p 3000 # -H 0.0.0.0: accesible fuera del contenedor
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      # next dev lee NEXT_PUBLIC_* en runtime (no necesita build args)
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      NEXT_PUBLIC_R2_PUBLIC_BASE: "https://bucket-vzla-terremoto.dreamit.software"
+      INTERNAL_API_URL: http://backend:8080
+      # File-watching por POLLING para Windows/Docker Desktop: los binds desde el
+      # filesystem de Windows no propagan eventos inotify al contenedor Linux. Con
+      # `--webpack` (arriba), webpack lee WATCHPACK_POLLING nativamente y hace poll
+      # de los archivos. `watchOptions.pollIntervalMs` de next.config.ts también se
+      # mapea a `watchOptions.poll` de webpack.
+      # IMPORTANTE: el polling NO rescata un repo clonado en C:\Users\... — ahí la
+      # capa drvfs de Docker Desktop ni siquiera refresca el mtime dentro del
+      # contenedor, así que no hay nada que el poll pueda detectar. El fix real es
+      # clonar el repo DENTRO del filesystem de WSL2 (ej. /home/usuario/...). Ver
+      # docs/guides/primeros-pasos.md → "Windows".
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - frontend_nm:/app/node_modules # enmascara el bind del host
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile.dev
+    working_dir: /app
+    # --webpack por fiabilidad del watcher/HMR en Docker/Windows. Ver la nota
+    # completa en el `command` del servicio frontend.
+    command: npx next dev --webpack -H 0.0.0.0 -p 3000
+    environment:
+      NODE_ENV: development # override del base (que pone production)
+      NEXT_TELEMETRY_DISABLED: "1"
+      # EMERGENCY_API_URL, COOKIE_SECURE, SESSION_MAX_AGE_SECONDS heredados del base
+      # Ver nota de WATCHPACK_POLLING/CHOKIDAR_USEPOLLING en el servicio frontend.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./admin:/app
+      - admin_nm:/app/node_modules
+
+volumes:
+  backend_nm:
+  frontend_nm:
+  admin_nm:

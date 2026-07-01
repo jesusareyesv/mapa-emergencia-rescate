@@ -18,6 +18,21 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: import.meta.dirname,
   },
+  // `next dev` bloquea con 403 las peticiones a `/_next/*` (HMR incluido) si el
+  // Origin no está en esta allowlist (por defecto solo localhost/*.localhost).
+  // Sin esto, entrar al dev server por 127.0.0.1 (común en Windows) deja el
+  // socket de HMR bloqueado: la página queda recargándose en loop y los cambios
+  // de código nunca llegan en vivo. No-op fuera de `next dev`.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
+  // File-watching por POLLING para Docker Desktop en Windows. Next 16 usa
+  // Turbopack en `next dev`, cuyo watcher (crate `notify`) NO ve eventos
+  // inotify en binds desde el filesystem de Windows → el hot reload no dispara.
+  // `WATCHPACK_POLLING`/`CHOKIDAR_USEPOLLING` NO los lee Turbopack; el knob real
+  // es `watchOptions.pollIntervalMs`, que Next pasa al watcher nativo de
+  // Turbopack (y a webpack con `--webpack`). Lo activamos SOLO cuando la env var
+  // WATCHPACK_POLLING está seteada (docker-compose.dev.yml), así en Mac/local el
+  // watching nativo (fsevents) sigue sin el costo de CPU del polling.
+  watchOptions: process.env.WATCHPACK_POLLING ? { pollIntervalMs: 500 } : undefined,
   // Protección anti version-skew para el roll multi-pod en Hetzner. `next build`
   // estampa un build-id ALEATORIO por defecto, así que los 2 pods de un mismo
   // deploy servirían URLs `/_next/static/<id>/…` distintas — un usuario en el pod

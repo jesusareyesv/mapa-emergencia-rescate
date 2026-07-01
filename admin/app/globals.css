@@ -1,0 +1,286 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tailwind v4 escanea desde app/globals.css; @source explícito garantiza que las
+ * clases de los atoms en src/ui (bg-navy, rounded-md, …) se generen siempre,
+ * aunque cambie la heurística de auto-detección.
+ */
+@source "../src/**/*.{ts,tsx}";
+
+/* ---------------------------------------------------------------------------
+ * Design tokens — subconjunto del sistema visual del sitio público (DESIGN.md)
+ * --------------------------------------------------------------------------- */
+:root {
+  /* Brand */
+  --brand-navy:    #092334;
+  --brand-blue:    #2b51f0;
+  --action-blue:   #1a98ff;
+  --crisis-red:    #c41a1a;
+  --crisis-red-h:  #991b1b;
+
+  /* Superficies */
+  --canvas:        #eef2f7;
+  --surface:       #ffffff;
+  --surface-muted: #f7f8f9;
+  --border:        #dde3eb;
+  --border-strong: #d6dbdf;
+
+  /* Texto */
+  --text:          #0a1628;
+  --text-muted:    #4a5568;
+  --text-soft:     #94a3b8;
+  --on-dark:       #ffffff;
+
+  /* Tipografía */
+  --font-body: "Space Grotesk", system-ui, sans-serif;
+
+  /* Radios */
+  --r-sm:   8px;
+  --r-md:   12px;
+  --r-lg:   16px;
+  --r-pill: 999px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
+}
+
+/* ---------------------------------------------------------------------------
+ * Tailwind v4 theme — expone los tokens como utilidades (bg-navy, text-crisis…)
+ * --------------------------------------------------------------------------- */
+@theme inline {
+  --color-navy:        var(--brand-navy);
+  --color-brand-blue:  var(--brand-blue);
+  --color-action:      var(--action-blue);
+  --color-crisis:      var(--crisis-red);
+  --color-crisis-h:    var(--crisis-red-h);
+  --color-canvas:      var(--canvas);
+  --color-surface:     var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border:      var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-etext:       var(--text);
+  --color-etext-muted: var(--text-muted);
+  --color-etext-soft:  var(--text-soft);
+  --color-on-dark:     var(--on-dark);
+
+  --font-sans: var(--font-body);
+
+  --animate-float: float 8s ease-in-out infinite;
+  --animate-float-reverse: float-reverse 10s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(12deg); }
+  50% { transform: translateY(-20px) rotate(15deg); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0) rotate(-12deg); }
+  50% { transform: translateY(20px) rotate(-15deg); }
+}
+
+/* ---------------------------------------------------------------------------
+ * Dark mode — se activa con la clase `.dark` en <html>
+ * Solo afecta al panel admin (el único que carga este CSS).
+ * Los colores de marca (navy, brand-blue, crisis-red) no cambian.
+ * --------------------------------------------------------------------------- */
+.dark {
+  --canvas:        #161616;
+  --surface:       #1c1c1c;
+  --surface-muted: #242424;
+  --border:        rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --text:          #ededed;
+  --text-muted:    #a0a0a0;
+  --text-soft:     #525252;
+}
+
+/* ---------------------------------------------------------------------------
+ * Modo Alan — se activa con la clase `.alan` en <html>
+ * Estética matrix: fondo negro puro, texto verde #00ff41.
+ * --------------------------------------------------------------------------- */
+.alan {
+  --canvas:        #060606;
+  --surface:       #0a0a0a;
+  --surface-muted: #0f0f0f;
+  --border:        rgba(0, 255, 65, 0.1);
+  --border-strong: rgba(0, 255, 65, 0.22);
+  --text:          #00ff41;
+  --text-muted:    #00a326;
+  --text-soft:     #004d14;
+  --on-dark:       #00ff41;
+  --brand-navy:    #001a08;
+}
+
+/* ---------------------------------------------------------------------------
+ * Stat cards — chip de ícono y barra de acento
+ * Light/dark: tinte suave del acento (como el sistema QI del frontend).
+ * Alan: color de acento completo (hacker).
+ * --------------------------------------------------------------------------- */
+.stat-chip {
+  background-color: color-mix(in srgb, var(--accent) 10%, var(--surface-muted));
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-muted));
+}
+.alan .stat-chip {
+  background-color: rgba(0, 255, 65, 0.12);
+  color: #00ff41;
+}
+
+.stat-accent-bar {
+  background-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong));
+  opacity: 0.5;
+}
+.alan .stat-accent-bar {
+  background-color: #00ff41;
+  opacity: 0.5;
+}
+.alan .group:hover .stat-accent-bar {
+  opacity: 0.9;
+}
+
+/* Hover glow en alan: verde matrix en lugar del arcoíris de acentos. */
+.alan .stat-card-link:hover {
+  border-color: #00ff41 !important;
+  box-shadow: 0 0 0 1px #00ff41, 0 8px 24px -12px rgba(0, 255, 65, 0.4) !important;
+}
+
+/* Chart de reportes — colores QI del frontend en todos los modos.
+   En alan: verde matrix para todas las barras (sin arcoíris). */
+.chart-bar {
+  background-color: color-mix(in srgb, var(--bar) 80%, var(--surface-muted));
+}
+.alan .chart-bar {
+  background-color: #00ff41;
+  opacity: 0.75;
+}
+
+/* Feed de actividad — colores QI en light/dark; verde matrix en alan. */
+.feed-type {
+  color: color-mix(in srgb, var(--type) 85%, var(--text-muted));
+}
+.alan .feed-type {
+  color: #00a326;
+}
+
+/* ---------------------------------------------------------------------------
+ * Base
+ * --------------------------------------------------------------------------- */
+html,
+body {
+  font-family: var(--font-body);
+  background: var(--canvas);
+  color: var(--text);
+}
+
+/* Sidebar nav scrollbar hidden but still scrollable */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Dashboard — animaciones (estética terminal/hacker)
+ * --------------------------------------------------------------------------- */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+  50%      { opacity: 0.7; box-shadow: 0 0 0 4px transparent; }
+}
+
+/* Overlay de arranque del modo Alan */
+@keyframes alan-boot {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  10%  { opacity: 0.3; }
+  14%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes scan-sweep {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100vh); }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 0.97; }
+  50%      { opacity: 0.92; }
+}
+
+/* Utilidades */
+.animate-fade-up {
+  opacity: 0;
+  animation: fade-up 0.5s ease-out forwards;
+}
+
+.dash-cursor::after {
+  content: "_";
+  margin-left: 1px;
+  animation: blink 1.1s step-end infinite;
+}
+
+.bar-fill {
+  transform-origin: left;
+  animation: bar-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-muted) 25%,
+    var(--border) 50%,
+    var(--surface-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+.alan-boot-overlay {
+  animation: alan-boot 1.3s ease-in-out forwards, flicker 0.15s steps(2) infinite;
+}
+
+.alan-scanline {
+  animation: scan-sweep 0.9s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .dash-cursor::after,
+  .bar-fill,
+  .shimmer,
+  .pulse-dot,
+  .alan-boot-overlay,
+  .alan-scanline {
+    animation: none;
+  }
+  .animate-fade-up { opacity: 1; }
+}

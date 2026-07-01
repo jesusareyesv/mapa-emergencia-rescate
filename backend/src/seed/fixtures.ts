@@ -224,8 +224,8 @@ export function buildFixtures(now: number): DemoData {
       createdAt: now - i * 17 * MIN,
     };
   });
-
-  const missing: DemoMissing[] = Array.from({ length: 120 }, (_, i) => {
+  // Se aumentó la calidad para probar las navegaciones de la busqueda de desaparecidos.
+  const missing: DemoMissing[] = Array.from({ length: 1000 }, (_, i) => {
     const city = pick(CITIES, i + 1);
     const found = i % 6 === 0;
     const hasCoords = i % 5 !== 0; // ~80% en el mapa

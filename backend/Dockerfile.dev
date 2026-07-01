@@ -1,0 +1,8 @@
+FROM node:20-slim
+WORKDIR /app
+# Deps en /app/node_modules (RAÍZ), igual que el Dockerfile de prod: backend/ e
+# infra/db/ comparten node_modules (Node sube por los padres; infra/ es hermano
+# de backend/). Contexto de build = raíz del repo.
+COPY backend/package.json backend/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+WORKDIR /app/backend

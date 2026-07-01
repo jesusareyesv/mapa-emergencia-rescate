@@ -9,10 +9,12 @@ import { missingRouter } from "@/routes/missing";
 import { reportsRouter } from "@/routes/reports";
 import { chatRouter } from "@/routes/chat";
 import { hospitalsRouter } from "@/routes/hospitals";
+import { earthquakesRouter } from "@/routes/earthquakes";
 import { donationsRouter } from "@/routes/donations";
 import { patientsRouter } from "@/routes/patients";
 import { geocodeRouter } from "@/routes/geocode";
 import { geoRouter } from "@/routes/geo";
+import { acopioRouter } from "@/modules/acopio";
 import { psychologyHelpRouter } from "@/routes/psychology-help";
 import { contactRouter } from "@/routes/contact";
 import { hubRouter } from "@/routes/hub";
@@ -40,7 +42,10 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Content-Type, If-None-Match, x-admin-token, cf-turnstile-token, authorization",
+      // openpanel-client-id: el SDK de OpenPanel lo manda en cada POST /api/op/track.
+      // Sin él en la allowlist, el preflight no autoriza el POST y el browser lo
+      // bloquea (TypeError: Failed to fetch) → analítica sin eventos. Ver routes/op.ts.
+      "Content-Type, If-None-Match, x-admin-token, cf-turnstile-token, authorization, openpanel-client-id",
     );
   }
   if (req.method === "OPTIONS") {
@@ -91,10 +96,12 @@ app.use("/api/missing", missingRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/hospitals", hospitalsRouter);
+app.use("/api/earthquakes", earthquakesRouter);
 app.use("/api/donations", donationsRouter);
 app.use("/api/patients", patientsRouter);
 app.use("/api/geocode", geocodeRouter);
 app.use("/api/geo", geoRouter);
+app.use("/api/acopio", acopioRouter);
 app.use("/api/stats/psychology-help", psychologyHelpRouter);
 app.use("/api/contact", contactRouter);
 app.use("/api/hub", hubRouter);

@@ -85,8 +85,8 @@ acción.
   · _propuesta_.
 - [0004 — Nodos efímeros (cluster-autoscaler) + split web/api](rfcs/0004-autoscaling-y-split-web-api.md)
   · _propuesta_.
-- [0005 — Microservicio del dashboard de administración (multi-API)](rfcs/0005-microservicio-dashboard-admin.md)
-  · _propuesta_ · extrae el panel `/admin` a un frontal Next.js + BFF.
+- [0005 — Panel admin standalone (3er tier)](rfcs/0005-panel-admin-standalone.md)
+  · _implementado_.
 
 ### ADRs
 
@@ -129,6 +129,7 @@ acción.
 
 ### Guías
 
+- [Primeros pasos (setup local, credenciales, URLs)](guides/primeros-pasos.md)
 - [Desplegar la sincronización con Vercel Cron](guides/sincronizacion-cron-vercel.md)
 - [Rendimiento, capacidad y pruebas de carga](guides/rendimiento-y-pruebas-de-carga.md)
 - [Documentar endpoints (OpenAPI / Swagger)](guides/documentar-endpoints-openapi.md)

@@ -85,6 +85,23 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Nunca interceptar la maquinaria de dev/HMR (Turbopack/webpack). Si este SW
+// quedó registrado en este origen de una visita ANTERIOR en modo producción
+// (p.ej. localhost:3000 con docker-compose.yml original) y luego se corre
+// `next dev` en el mismo puerto, el cache-first de abajo serviría para siempre
+// el chunk viejo del cliente de HMR — matando el hot reload y forzando reload
+// loops porque el HMR nunca calza con la sesión real del dev server. Estos
+// paths NO existen en un build de producción, así que excluirlos es inocuo ahí.
+function isDevBundlerAsset(url) {
+  return (
+    url.pathname.startsWith("/_next/webpack-hmr") ||
+    url.pathname.startsWith("/_next/static/webpack/") ||
+    url.pathname.includes("[turbopack]") ||
+    url.pathname.includes("%5Bturbopack%5D") ||
+    url.pathname.startsWith("/__nextjs")
+  );
+}
+
 function isPhotoApi(url) {
   return (
     url.pathname.startsWith("/api/missing/") && url.pathname.endsWith("/photo")
@@ -125,10 +142,18 @@ async function networkFirst(request, cacheName) {
     const fresh = await fetchWithTimeout(request, API_TIMEOUT_MS);
     if (fresh.ok) cache.put(request, fresh.clone());
     return fresh;
-  } catch (err) {
+  } catch {
     const cached = await cache.match(request);
     if (cached) return cached;
-    throw err;
+    // Sin red y sin caché: degradamos con una respuesta JSON sintética en vez de
+    // propagar el error. Si hiciéramos `throw`, `event.respondWith()` recibiría una
+    // promesa rechazada y el navegador filtraría "FetchEvent.respondWith received an
+    // error: …" a la UI. Con un 503 normal, la app ve `!res.ok` y muestra su propio
+    // mensaje amable.
+    return new Response(JSON.stringify({ error: "offline" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
   }
 }
 
@@ -149,6 +174,7 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
+  if (isDevBundlerAsset(url)) return;
 
   // 1. Navegaciones HTML: cache-first después de la primera visita, con
   // refresco en segundo plano para que la app abra aun con señal muy débil.

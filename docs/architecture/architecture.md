@@ -71,6 +71,32 @@ con `mediaUrl()`.
   (Cloudflare Turnstile). Las rutas admin usan `ADMIN_PASSWORD`/headers
   existentes.
 - Lecturas polleadas usan cache en proceso y ETag cuando el contrato lo permite.
+- APIs de terceros se consumen vía PROXY del backend (nunca desde el navegador),
+  para controlar cache/contrato y no depender del CORS del tercero. Caso simple:
+  `/api/geocode` proxea Nominatim (`services/geocode.ts`).
+
+## Módulos de integración (DDD/hexagonal)
+
+Las integraciones con terceros viven como **bounded contexts** en
+`backend/src/modules/<dominio>/`, con capas separadas y dependencias hacia
+adentro (la infraestructura depende del dominio, no al revés):
+
+- `domain/`: entidades + value objects + reglas puras y el **puerto** (interfaz)
+  que define la fuente. Sin HTTP, sin red, sin `env`.
+- `application/`: casos de uso que orquestan el dominio sobre el puerto.
+- `infrastructure/`: adaptadores que implementan el puerto (cliente HTTP, mapper
+  anti-corruption) y decoradores transversales (p.ej. cache).
+- `interface/http/`: router + controlador + presenter (única capa que conoce
+  Express). El `@swagger` vive aquí; `lib/swagger.ts` ya escanea `modules/**`.
+- `<dominio>-module.ts`: composition root; el único sitio que lee `env` y cablea
+  adaptador → puerto → caso de uso → router.
+
+Primer módulo: **acopio** (`modules/acopio/`), que proxea el directorio de
+centros de acopio de ResponseGrid (config en `RESPONSEGRID_API_URL` /
+`RESPONSEGRID_EMERGENCY_SLUG`). Añadir otra fuente = otro adaptador del mismo
+puerto, cableado en el composition root; el dominio y la capa HTTP no cambian.
+Las reglas ESLint de endpoints (`require-rate-limit`, guard de mutaciones)
+también cubren `src/modules/**`.
 
 ## Datos y migraciones
 
@@ -92,6 +118,17 @@ con `mediaUrl()`.
   configuración del Deployment (`SYNC_SCHEDULERS=0`, `HUB_SCHEDULERS=0`).
 - El worker sigue disponible para jobs manuales como backfill de Neon,
   migración de fotos a R2 y trabajos encolados explícitamente.
+- **Sismos USGS** (`earthquakes.queue.ts`): el worker poll-ea el feed realtime
+  del USGS (`2.5_week.geojson`, global) cada `EARTHQUAKES_EVERY_MS` (default 60s,
+  la cadencia con la que USGS lo refresca), filtra al bounding box de Venezuela y
+  hace upsert por id de evento en la tabla `earthquakes`. Al arrancar, si la tabla
+  está vacía, encola un backfill puntual vía FDSN query (últimos
+  `EARTHQUAKES_BACKFILL_DAYS` días, una sola llamada — Venezuela genera <1
+  sismo/día). A diferencia de sync/hub, este scheduler **siempre corre** (no va
+  bajo `SYNC_SCHEDULERS`): es dato público y barato. El backfill de arranque es
+  idempotente (solo si la tabla está vacía), así que **el primer deploy siembra
+  solo** — sin Job ni paso manual. La superficie pública es `GET
+  /api/earthquakes` (read-only, anónima, cacheada con ETag).
 
 ## Despliegue
 
