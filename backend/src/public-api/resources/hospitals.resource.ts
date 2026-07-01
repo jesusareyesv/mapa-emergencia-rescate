@@ -23,8 +23,12 @@ const level = z.enum(["I", "II", "III", "IV", "militar"]).nullable();
 
 // Coordenadas y teléfono institucional públicos (nullable: se pueden limpiar
 // enviando null). Mismo rango que reports.resource para lat/lng.
-const lat = z.coerce.number().min(-90).max(90).nullable();
-const lng = z.coerce.number().min(-180).max(180).nullable();
+// Un string vacío/en blanco cuenta como "sin dato" (null): sin este preprocess
+// `z.coerce.number()` lo coaccionaría a 0 y publicaría un punto 0,0 falso.
+const blankToNull = (v: unknown) =>
+  typeof v === "string" && v.trim() === "" ? null : v;
+const lat = z.preprocess(blankToNull, z.coerce.number().min(-90).max(90).nullable());
+const lng = z.preprocess(blankToNull, z.coerce.number().min(-180).max(180).nullable());
 const phone = z.string().trim().max(40).nullable();
 
 const createSchema = z.object({

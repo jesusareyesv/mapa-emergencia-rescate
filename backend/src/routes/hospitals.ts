@@ -33,6 +33,7 @@ import type {
   HospitalSupplyStatus,
 } from "@/services/hospitals";
 import {
+  publishNeedAtLocation,
   publishNeedByAddress,
   type NeedCategory,
   type Priority,
@@ -296,8 +297,9 @@ const HOSPITAL_URGENCY_TO_PRIORITY: Record<HospitalSupplyStatus, Priority> = {
 
 /**
  * Espeja una necesidad de insumos del hospital como necesidad pública en
- * ResponseGrid. El hospital no guarda coordenadas, así que el backend geocodifica
- * su dirección. Best-effort: no afecta al flujo del hospital.
+ * ResponseGrid. Si el hospital tiene coordenadas guardadas se usan directamente;
+ * si no, el backend geocodifica su dirección. Best-effort: no afecta al flujo del
+ * hospital.
  */
 function mirrorHospitalNeed(
   hospital: Hospital,
@@ -306,23 +308,34 @@ function mirrorHospitalNeed(
   const address = [hospital.address, hospital.municipality, hospital.state]
     .filter(Boolean)
     .join(", ");
-  if (!address) return; // sin dirección no se puede geocodificar
-  void publishNeedByAddress({
-    title: `${hospital.name}: ${need.itemType}`.slice(0, 140),
-    priority: HOSPITAL_URGENCY_TO_PRIORITY[need.urgency],
-    address,
-    items: [
-      {
-        name: need.itemType.slice(0, 120),
-        quantity: Math.max(1, need.quantity ?? 1),
-        unit: need.unit.trim() || null,
-        category: HOSPITAL_CATEGORY_TO_NEED[need.category],
-      },
-    ],
-    description:
-      need.publicNote.trim() ||
-      `Necesidad de insumos del hospital ${hospital.name} (${hospital.state}).`,
-  });
+  if (!address) return; // sin dirección no se puede geocodificar ni ubicar
+  const title = `${hospital.name}: ${need.itemType}`.slice(0, 140);
+  const items = [
+    {
+      name: need.itemType.slice(0, 120),
+      quantity: Math.max(1, need.quantity ?? 1),
+      unit: need.unit.trim() || null,
+      category: HOSPITAL_CATEGORY_TO_NEED[need.category],
+    },
+  ];
+  const priority = HOSPITAL_URGENCY_TO_PRIORITY[need.urgency];
+  const description =
+    need.publicNote.trim() ||
+    `Necesidad de insumos del hospital ${hospital.name} (${hospital.state}).`;
+
+  if (hospital.lat !== null && hospital.lng !== null) {
+    void publishNeedAtLocation({
+      title,
+      priority,
+      address,
+      latitude: hospital.lat,
+      longitude: hospital.lng,
+      items,
+      description,
+    });
+    return;
+  }
+  void publishNeedByAddress({ title, priority, address, items, description });
 }
 
 // ===========================================================================

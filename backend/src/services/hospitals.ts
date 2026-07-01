@@ -347,21 +347,18 @@ function normalizeLevel(v: string | null | undefined): HospitalLevel {
   return null;
 }
 
-/** Latitud válida en [-90, 90]; cualquier otro valor (o vacío) → null. */
-function normalizeLat(v: number | string | null | undefined): number | null {
+/** Coordenada válida dentro de ±limit; cualquier otro valor (o vacío) → null. */
+function normalizeCoord(
+  v: number | string | null | undefined,
+  limit: number,
+): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
-  if (!Number.isFinite(n) || n < -90 || n > 90) return null;
+  if (!Number.isFinite(n) || n < -limit || n > limit) return null;
   return n;
 }
-
-/** Longitud válida en [-180, 180]; cualquier otro valor (o vacío) → null. */
-function normalizeLng(v: number | string | null | undefined): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n < -180 || n > 180) return null;
-  return n;
-}
+const normalizeLat = (v: number | string | null | undefined) => normalizeCoord(v, 90);
+const normalizeLng = (v: number | string | null | undefined) => normalizeCoord(v, 180);
 
 /** Teléfono institucional público, recortado; vacío → null. */
 function normalizePhone(v: string | null | undefined): string | null {
